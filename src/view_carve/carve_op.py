@@ -21,11 +21,17 @@ class CarveOp(bpy.types.Operator):
   prop_use_gPencil = bpy.props.BoolProperty(name='Use GPencil',
     description='Use strokes from the active grease pencil frame for carving', default=True)
   prop_use_selection = bpy.props.BoolProperty(name='Use Selected Objects',
-    description='Use selected objects (other than the active object) for carving (DOESN\'T WORK YET)', default=True)
+    description='Use selected objects (other than the active object) for carving', default=True)
   prop_union_carves = bpy.props.BoolProperty(name='Union Carves',
     description='Make a single carve using the union of the carver objects/strokes.', default=False)
   prop_delete_carvers = bpy.props.BoolProperty(name='Delete Carve Objects',
     description='Delete objects and/or grease pencil strokes used for carving', default=False)
+  prop_convex_hull_curve = bpy.props.BoolProperty(name='Convex Hull (Curves)',
+    description='Use convex hull of curves and grease pencil strokes instead of closing them. Reduces the risk of bad geometry in the result.',
+    default=False)
+  prop_convex_hull_mesh = bpy.props.BoolProperty(name='Convex Hull (Meshes)',
+    description='Use convex hull of non-curve-shaped meshes. Reduces the risk of bad geometry in the result.',
+    default=True)
   prop_boolean_solver = bpy.props.EnumProperty(items=[
     ('BMESH', 'BMesh', 'BMesh', 0),
     ('CARVE', 'Carve', 'Carve', 1)],
@@ -75,11 +81,12 @@ class CarveOp(bpy.types.Operator):
         return {'FINISHED'}
       
       # Create carve mesh objects.
-      carve_objs = [mesh_project.carver_to_carve_obj(context, carver, view_point, view_dir, project_dist) for carver in carvers]
+      carve_objs = [mesh_project.carver_to_carve_obj(context, carver, view_point, view_dir, project_dist,
+        self.prop_convex_hull_mesh, self.prop_convex_hull_curve) for carver in carvers]
       carve_objs = [o for o in carve_objs if o is not None]
       
       # Union the carve meshes if we are in Union Carves mode.
-      if self.prop_union_carves:
+      if self.prop_union_carves and len(carve_objs) > 0:
         single_carve = util_mesh.union_objects(context, carve_objs, self.prop_boolean_solver, _BOOLEAN_OP_THRESHOLD,
           delete=True, delete_data=True)
         carve_objs = [single_carve]
