@@ -7,6 +7,7 @@ import mathutils
 # TODO: Improve docstrings.
 
 _DIST_SQ_ZERO_THRESHOLD = 0.000000001
+_DOT_PROD_ZERO_THRESHOLD = 0.000000001
 
 def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, convex_hull_solid=True,
   convex_hull_curve=False):
@@ -200,12 +201,14 @@ def _face_pts_to_carve_mesh_perspective(face_pts, view_point, view_dir, project_
   # Project the points to be the specified distance from the view point.
   def convert(point):
     displacement = point - view_point
-    if displacement.dot(view_dir) < 0:
+    dot_prod = displacement.dot(view_dir)
+    if dot_prod < _DOT_PROD_ZERO_THRESHOLD:
       raise ValueError('Carver behind camera')
-    dist_sq = displacement.length_squared
-    if dist_sq < _DIST_SQ_ZERO_THRESHOLD:
+    dist = displacement.length
+    desired_dist = project_dist * dist / dot_prod
+    if dist < _DIST_SQ_ZERO_THRESHOLD:
       raise ValueError('Carver too close to camera; cannot project')
-    return view_point + displacement * project_dist / math.sqrt(dist_sq)
+    return view_point + displacement * desired_dist / dist
   projected_pts = [convert(point) for point in face_pts]
   
   # Build the mesh.
