@@ -7,7 +7,7 @@ bl_info = {
   'name' : 'Projection Carving Tool',
   'description' : 'Tool for carving a mesh object based on projections of curves in the 3D viewport',
   'author' : 'Allen Marshall',
-  'version' : (0, 2),
+  'version' : (0, 3),
   'blender' : (2, 7, 9),
   'category' : 'Mesh',
 }

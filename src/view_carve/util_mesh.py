@@ -1,8 +1,15 @@
 import bpy
 
-# TODO: Improve docstrings.
-
 def union_objects(context, objs, solver, double_threshold, delete=False, delete_data=False):
+  """Creates a new object containing the boolean union of the specified objects.
+  Returns: The new object
+  context - The Blender context
+  objs - Mesh objects to union
+  solver - Solver parameter for the boolean modifiers
+  double_threshold - Threshold parameter for the boolean modifiers
+  delete - If true, the objects in objs will be deleted after the union is performed.
+  delete_data - If true, the mesh data associated with the objects in objs will be deleted after the union is
+    performed."""
   try:
     # Start with an empty mesh object.
     new_mesh = bpy.data.meshes.new('viewCarveTemp_mesh')
@@ -32,7 +39,13 @@ def union_objects(context, objs, solver, double_threshold, delete=False, delete_
 
 def apply_boolean_op(context, target, obj, operation, solver, double_threshold):
   """Adds and immediately applies a boolean modifier to the specified target object.
-  May not work correctly if the target has unapplied modifiers."""
+  May not work correctly if the target has unapplied modifiers.
+  context - The Blender context
+  target - The object to which the boolean modifier will be applied
+  obj - The object to use in the modifier
+  operation - Operation parameter for the boolean modifier
+  solver - Solver parameter for the boolean modifier
+  double_threshold - Threshold parameter for the boolean modifier"""
   context.scene.objects.active = target
   mod = target.modifiers.new('curveSepTemp_modifier', 'BOOLEAN')
   mod.operation = operation

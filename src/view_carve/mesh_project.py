@@ -2,14 +2,28 @@ import bpy
 import bmesh
 import mathutils
 
-# TODO: Improve docstrings.
-
 _DIST_SQ_ZERO_THRESHOLD = 0.000000001
 _DIST_ZERO_THRESHOLD = 0.000001
 _DOT_PROD_ZERO_THRESHOLD = 0.000001
 
 def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, convex_hull_solid=True,
   convex_hull_curve=False):
+  """Projects the specified carver (grease pencil stroke or object) based on the view plane to get a mesh for carving.
+  The resulting mesh object can be used in boolean operations to perform the carve.
+  Returns: The projected mesh object to use for carving, or None if carver could not be converted.
+  context - The Blender context
+  carver - The grease pencil stroke, curve object, or mesh object to project
+  view_point - Position of the camera in world space. This could be computed from the context, but is passed in for
+    efficiency.
+  view_dir - Direction of the camera in world space. This could be computed from the context, but is passed in for
+    efficiency.
+  project_dist - The projection distance, in world units
+  convex_hull_solid - Indicates whether non-path-shaped meshes should be converted to their convex hulls (in the view
+    plane) before projection. This can greatly reduce the chance of bad geometry in the final carve, but also reduces
+    flexibility.
+  convex_hull_curve - Indicates whether grease pencil strokes, curve objects, and path-shaped meshes should be converted
+    to their convex hulls (in the view plane) instead of just being closed. This can reduce the chance of bad geometry
+    in the final carve, but also reduces flexibility."""
   try:
     # Get the face points for constructing the carve mesh.
     if isinstance(carver, bpy.types.GPencilStroke):
@@ -42,6 +56,12 @@ def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, con
     raise e
 
 def _gPencil_stroke_to_face_pts(context, stroke, convex_hull_curve):
+  """Converts a grease pencil stroke to a sequence of face points to project.
+  Returns: The sequence of face points suitable for passing to _face_pts_to_carve_mesh_perspective or
+    _face_pts_to_carve_mesh_orthographic, or None if the conversion failed.
+  context - The Blender context
+  stroke - The grease pencil stroke
+  convex_hull_curve - See carver_to_carve_obj."""
   if convex_hull_curve:
     return _convex_hull_face_pts(context, stroke.points, None)
   
@@ -57,6 +77,12 @@ def _gPencil_stroke_to_face_pts(context, stroke, convex_hull_curve):
   return pts
 
 def _curve_obj_to_face_pts(context, obj, convex_hull_curve):
+  """Converts a Blender curve object to a sequence of face points to project.
+  Returns: The sequence of face points suitable for passing to _face_pts_to_carve_mesh_perspective or
+    _face_pts_to_carve_mesh_orthographic, or None if the conversion failed.
+  context - The Blender context
+  obj - The curve object to convert
+  convex_hull_curve - See carver_to_carve_obj."""
   try:
     # Convert into a path-shaped mesh.
     bpy.ops.object.select_all(action='DESELECT')
@@ -77,6 +103,15 @@ def _curve_obj_to_face_pts(context, obj, convex_hull_curve):
       
 
 def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
+  """Converts a Blender mesh object to a sequence of face points to project.
+  First tries to treat the mesh as path-shaped. If that fails, tries to flatten the mesh in view space and remove
+  internal vertices before projection.
+  Returns: The sequence of face points suitable for passing to _face_pts_to_carve_mesh_perspective or
+    _face_pts_to_carve_mesh_orthographic, or None if the conversion failed.
+  context - The Blender context
+  obj - The mesh object to convert
+  convex_hull_solid - See carver_to_carve_obj. This setting is used if the mesh is not path-shaped.
+  convex_hull_curve - See carver_to_carve_obj. This setting is used if the mesh is path-shaped."""
   if len(list(obj.data.vertices)) == 0:
     return None
   
@@ -127,6 +162,13 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
         bpy.data.objects.remove(temp_obj)
 
 def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
+  """Converts a path-shaped Blender mesh object to a sequence of face points to project.
+  Returns: The sequence of face points suitable for passing to _face_pts_to_carve_mesh_perspective or
+    _face_pts_to_carve_mesh_orthographic, or None if the conversion failed. A return value of None typically means the
+    mesh was not path-shaped.
+  context - The Blender context
+  obj - The mesh object to convert
+  convex_hull_curve - See carver_to_carve_obj."""
   try:
     if convex_hull_curve:
       return _convex_hull_face_pts(context, obj.data.vertices, obj.matrix_world)
@@ -147,8 +189,8 @@ def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
     if len(start_edges) not in {1, 2}:
       return None
     
-    (looped, pts_before) = _follow_edges(bm, start_vert, start_edges[0])
-    pts_after = [] if looped else (_follow_edges(bm, start_vert, start_edges[1])[1] if len(start_edges) > 1 else [])
+    (looped, pts_before) = _follow_edges(start_vert, start_edges[0])
+    pts_after = [] if looped else (_follow_edges(start_vert, start_edges[1])[1] if len(start_edges) > 1 else [])
     
     if pts_before is None or pts_after is None:
       return None
@@ -170,7 +212,13 @@ def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
     if 'bm' in locals():
       bm.free()
 
-def _follow_edges(bm, start_vert, start_edge):
+def _follow_edges(start_vert, start_edge):
+  """Follows a path of consecutive edges in a BMesh.
+  Returns: A tuple (loop, verts). loop is True if the start vertex was reached at the end, indicating a loop. verts is a
+    sequence of the vertices that were visited, not including the start vertex. Returns (False, None) if the edges could
+    not be followed because of a fork in the path.
+  start_vert - Vertex to start at
+  start_edge - Edge to start with. Should be connected to start_vert."""
   pts = []
   prev_vert = start_vert
   curr_vert = start_edge.other_vert(start_vert)
@@ -178,7 +226,7 @@ def _follow_edges(bm, start_vert, start_edge):
   curr_edges.index_update()
   while len(curr_edges) > 1 and curr_vert != start_vert:
     if len(curr_edges) != 2:
-      return None
+      return (False, None)
     else:
       pts.append(curr_vert.co)
       
@@ -197,6 +245,13 @@ def _follow_edges(bm, start_vert, start_edge):
     return (True, pts)
 
 def _convex_hull_face_pts(context, verts, world_matrix):
+  """Converts a set of vertices to a sequence of face points to project, based on their convex hull (in the view plane).
+  Returns: The sequence of face points suitable for passing to _face_pts_to_carve_mesh_perspective or
+    _face_pts_to_carve_mesh_orthographic, or None if the conversion failed.
+  context - The Blender context
+  verts - Sequence containing the grease pencil points or mesh vertices to convert.
+  world_matrix - Transform from the vertices' local space to world space. Use None if the vertices are already in world
+    space."""
   if len(list(verts)) == 0:
     return None
   
@@ -217,6 +272,12 @@ def _convex_hull_face_pts(context, verts, world_matrix):
   return [convert_to_world(verts[idx].co) for idx in hull_idxs]
 
 def _face_pts_to_carve_mesh_perspective(face_pts, view_point, view_dir, project_dist):
+  """Projects a sequence of face points through the 3D viewport to generate a carve mesh.
+  This function is suitable for use in perspective view mode.
+  face_pts - The sequence of face points to project
+  view_point - Position of the camera in world space
+  view_dir - Direction of the camera in world space
+  project_dist - The projection distance, in world units"""
   # Project the points to be the specified distance from the view point.
   def convert(point):
     displacement = point - view_point
@@ -242,6 +303,12 @@ def _face_pts_to_carve_mesh_perspective(face_pts, view_point, view_dir, project_
   return _carve_mesh_from_pydata(vertices, edges, faces)
 
 def _face_pts_to_carve_mesh_orthographic(face_pts, view_point, view_dir, project_dist):
+  """Projects a sequence of face points through the 3D viewport to generate a carve mesh.
+  This function is suitable for use in orthographic view mode.
+  face_pts - The sequence of face points to project
+  view_point - Position of the camera in world space
+  view_dir - Direction of the camera in world space
+  project_dist - The projection distance, in world units"""
   # Project the points into the view plane.
   pts_in_view_plane = [point - view_dir * mathutils.geometry.distance_point_to_plane(point, view_point, view_dir) for point in face_pts]
   
@@ -264,6 +331,12 @@ def _face_pts_to_carve_mesh_orthographic(face_pts, view_point, view_dir, project
   return _carve_mesh_from_pydata(vertices, edges, faces)
 
 def _carve_mesh_from_pydata(vertices, edges, faces):
+  """Creates a carve mesh from the specified vertices, edges, and faces.
+  Automatically attempts to make the mesh's normals consistent.
+  Returns: The new mesh.
+  vertices - See bpy.types.Mesh.from_pydata.
+  edges - See bpy.types.Mesh.from_pydata.
+  faces - See bpy.types.Mesh.from_pydata."""
   try:
     mesh = bpy.data.meshes.new('viewCarveTemp_carveMesh')
     mesh.from_pydata(vertices, edges, faces)

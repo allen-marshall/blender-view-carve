@@ -6,12 +6,32 @@ import mathutils
 
 from . import find, mesh_project, util_mesh
 
-# TODO: Improve docstrings.
-
 _BOOLEAN_OP_THRESHOLD = 0.000001
 _PROJECT_DIST_PADDING = 0.1
 
 class CarveOp(bpy.types.Operator):
+  """Operator that carves off pieces of the active object based on other selected objects and/or grease pencil strokes.
+  Carver objects and strokes are projected through the current 3D viewport to determine how to carve.
+  Properties:
+  prop_subtract_only - If false, the pieces cut off from the target mesh will be left in the scene as new objects. If
+    true, the pieces will be deleted, leaving only the carved target mesh. Default: False
+  prop_use_gPencil - If true, the operator will look for strokes in the active grease pencil frame to use for carving.
+    Default: True
+  prop_use_selection - If true, the operator will look for selected curve and/or mesh objects (other than the active
+    object) to use for carving. Default: True
+  prop_union_carves - If true, the operator will apply all found carvers as a single cut. This option only matters when
+    prop_subtract_only is false. In that case, setting prop_union_carves to true results in a maximum of one new object,
+    while setting it to false can result in more than one new object. Default: False
+  prop_delete_carvers - If true, the grease pencil strokes and/or selected objects used for carving will be deleted.
+    Default: False
+  prop_convex_hull_curve - If true, curves, strokes, and path-shaped meshes used for carving will be converted to their
+    convex hulls (in the view plane) before carving, instead of just being closed. This can result in a lower chance of
+    bad geometry in the result, but also reduces flexibility. Default: False
+  prop_convex_hull_mesh - If true, non-path-shaped meshes will be converted to their convex hulls (in the view plane)
+    before carving. This can result in a much lower chance of bad geometry in the result, but also reduces flexibility.
+    Default: True
+  prop_boolean_solver - The solver parameter to use for boolean modifiers. Default: 'BMESH'
+  """
   bl_label = 'Viewport Carve'
   bl_idname = 'view_carve.carve'
   bl_description = 'Separate a mesh object based on other objects projected through the current view'
@@ -154,14 +174,24 @@ class CarveOp(bpy.types.Operator):
           bpy.data.meshes.remove(mesh)
   
   def _max_dist_through_bound_box(self, view_point, bb_pts):
+    """Computes the maximum distance between the given view point and any point in the specified bounding box.
+    Returns: The maximum distance found.
+    view_point - The view point
+    bb_pts - Sequence of bounding box corner points"""
     return math.sqrt(max([(bb_pt - view_point).length_squared for bb_pt in bb_pts]))
   
   def _clear_gPencil_frame(self, context):
+    """Clears the active grease pencil frame, if there is one.
+    context - The Blender context"""
     frame = find.find_active_gPencil_frame(context)
     if frame is not None:
       frame.clear()
   
   def _find_carvers(self, context, target):
+    """Finds the grease pencil strokes and/or carver objects that should be used for carving.
+    Returns: A sequence of grease pencil strokes and/or Blender objects
+    context - The Blender context
+    target - The target to be carved"""
     carvers = []
     
     # Find selected objects for carving.
@@ -182,6 +212,13 @@ class CarveOp(bpy.types.Operator):
     return carvers
   
   def _separate_obj(self, context, target, carve_obj, base_target_name):
+    """Separates a mesh object using the specified carve.
+    Returns: The new mesh object obtained by cutting off a piece of the target, or None if no object was generated.
+    context - The Blender context
+    target - The mesh object to carve
+    carve_obj - The mesh object to use for boolean operations on the target. This should typically be an object obtained
+      by calling mesh_project.carver_to_carve_obj.
+    base_target_name - The base name to use for the new mesh object"""
     try:
       
       # If we are not in Subtract Only mode, we will need a copy of the target mesh data to create the new object.
