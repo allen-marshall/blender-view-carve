@@ -92,7 +92,7 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
     
     try:
       mesh_copy = obj.data.copy()
-      mesh_copy.transform(context.region_data.view_matrix)
+      mesh_copy.transform(context.region_data.view_matrix * obj.matrix_world)
       mesh_copy.update()
       
       temp_obj = bpy.data.objects.new('viewCarveTemp_manipMeshObj', mesh_copy)
@@ -108,6 +108,9 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
       bpy.ops.mesh.remove_doubles()
       bpy.ops.mesh.dissolve_degenerate()
       bpy.ops.mesh.dissolve_limited()
+      bpy.ops.mesh.delete(type='ONLY_FACE')
+      
+      bpy.ops.object.mode_set(mode=old_mode)
       
       mesh_copy.transform(context.region_data.view_matrix.inverted())
       mesh_copy.update()
@@ -144,8 +147,8 @@ def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
     if len(start_edges) not in {1, 2}:
       return None
     
-    pts_before = _follow_edges(bm, start_vert, start_edges[0])
-    pts_after = _follow_edges(bm, start_vert, start_edges[1]) if len(start_edges) > 1 else []
+    (looped, pts_before) = _follow_edges(bm, start_vert, start_edges[0])
+    pts_after = [] if looped else (_follow_edges(bm, start_vert, start_edges[1])[1] if len(start_edges) > 1 else [])
     
     if pts_before is None or pts_after is None:
       return None
@@ -155,7 +158,12 @@ def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
       return None
     
     pts_before.reverse()
-    return pts_before + [start_pt] + pts_after
+    pts = pts_before + [start_pt] + pts_after
+    def convert(pt):
+      new_pt = obj.matrix_world * mathutils.Vector(pt[0:3] + (1,))
+      new_pt /= new_pt.w
+      return new_pt.to_3d()
+    return [convert(pt) for pt in pts]
   
   finally:
     # Clean up.
@@ -184,8 +192,9 @@ def _follow_edges(bm, start_vert, start_edge):
   
   if curr_vert != start_vert:
     pts.append(curr_vert.co)
-  
-  return pts
+    return (False, pts)
+  else:
+    return (True, pts)
 
 def _convex_hull_face_pts(context, verts, world_matrix):
   if len(list(verts)) == 0:
