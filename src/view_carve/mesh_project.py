@@ -1,5 +1,3 @@
-import math
-
 import bpy
 import bmesh
 import mathutils
@@ -7,7 +5,8 @@ import mathutils
 # TODO: Improve docstrings.
 
 _DIST_SQ_ZERO_THRESHOLD = 0.000000001
-_DOT_PROD_ZERO_THRESHOLD = 0.000000001
+_DIST_ZERO_THRESHOLD = 0.000001
+_DOT_PROD_ZERO_THRESHOLD = 0.000001
 
 def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, convex_hull_solid=True,
   convex_hull_curve=False):
@@ -44,7 +43,7 @@ def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, con
 
 def _gPencil_stroke_to_face_pts(context, stroke, convex_hull_curve):
   if convex_hull_curve:
-    return _convex_hull_face_pts(context, stroke.points)
+    return _convex_hull_face_pts(context, stroke.points, None)
   
   if len(list(stroke.points)) == 0:
     return None
@@ -67,7 +66,7 @@ def _curve_obj_to_face_pts(context, obj, convex_hull_curve):
     mesh_obj = context.scene.objects.active
     
     if convex_hull_curve:
-      return _convex_hull_face_pts(context, mesh_obj.data.vertices)
+      return _convex_hull_face_pts(context, mesh_obj.data.vertices, mesh_obj.matrix_world)
     else:
       return _path_mesh_obj_to_face_pts(context, mesh_obj, convex_hull_curve)
   finally:
@@ -88,7 +87,7 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
   
   # If that fails (the mesh wasn't path-shaped), try to treat the mesh as solid.
   if convex_hull_solid:
-    return _convex_hull_face_pts(context, obj.data.vertices)
+    return _convex_hull_face_pts(context, obj.data.vertices, obj.matrix_world)
   else:
     
     try:
@@ -127,7 +126,7 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
 def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
   try:
     if convex_hull_curve:
-      return _convex_hull_face_pts(context, obj.data.vertices)
+      return _convex_hull_face_pts(context, obj.data.vertices, obj.matrix_world)
     
     if len(list(obj.data.vertices)) == 0:
       return None
@@ -188,14 +187,25 @@ def _follow_edges(bm, start_vert, start_edge):
   
   return pts
 
-def _convex_hull_face_pts(context, verts):
+def _convex_hull_face_pts(context, verts, world_matrix):
   if len(list(verts)) == 0:
     return None
   
   # Compute convex hull in the view plane.
-  plane_pts = [(context.region_data.view_matrix * mathutils.Vector(vert.co[0:2] + (1,))).to_2d() for vert in verts]
+  transform = context.region_data.view_matrix * world_matrix if world_matrix is not None else context.region_data.view_matrix
+  def convert(pt):
+    new_pt = transform * mathutils.Vector(pt[0:3] + (1,))
+    new_pt /= new_pt.w
+    return new_pt.to_2d()
+  plane_pts = [convert(vert.co) for vert in verts]
   hull_idxs = mathutils.geometry.convex_hull_2d(plane_pts)
-  return [mathutils.Vector(verts[idx].co) for idx in hull_idxs]
+  def convert_to_world(pt):
+    new_pt = mathutils.Vector(pt[0:3] + (1,))
+    if world_matrix is not None:
+      new_pt = world_matrix * new_pt
+    new_pt /= new_pt.w
+    return new_pt.to_3d()
+  return [convert_to_world(verts[idx].co) for idx in hull_idxs]
 
 def _face_pts_to_carve_mesh_perspective(face_pts, view_point, view_dir, project_dist):
   # Project the points to be the specified distance from the view point.
@@ -206,7 +216,7 @@ def _face_pts_to_carve_mesh_perspective(face_pts, view_point, view_dir, project_
       raise ValueError('Carver behind camera')
     dist = displacement.length
     desired_dist = project_dist * dist / dot_prod
-    if dist < _DIST_SQ_ZERO_THRESHOLD:
+    if dist < _DIST_ZERO_THRESHOLD:
       raise ValueError('Carver too close to camera; cannot project')
     return view_point + displacement * desired_dist / dist
   projected_pts = [convert(point) for point in face_pts]
