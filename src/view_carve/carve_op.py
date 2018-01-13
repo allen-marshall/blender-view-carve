@@ -1,4 +1,5 @@
 import math
+import traceback
 
 import bpy
 import mathutils
@@ -27,10 +28,10 @@ class CarveOp(bpy.types.Operator):
   prop_delete_carvers = bpy.props.BoolProperty(name='Delete Carve Objects',
     description='Delete objects and/or grease pencil strokes used for carving', default=False)
   prop_convex_hull_curve = bpy.props.BoolProperty(name='Convex Hull (Curves)',
-    description='Use convex hull of curves and grease pencil strokes instead of closing them. Reduces the risk of bad geometry in the result.',
+    description='Use convex hull of curves, grease pencil strokes, and path-shaped meshes instead of just closing them. Reduces the risk of bad geometry in the result.',
     default=False)
   prop_convex_hull_mesh = bpy.props.BoolProperty(name='Convex Hull (Meshes)',
-    description='Use convex hull of non-curve-shaped meshes. Reduces the risk of bad geometry in the result.',
+    description='Use convex hull of non-path-shaped meshes. Reduces the risk of bad geometry in the result.',
     default=True)
   prop_boolean_solver = bpy.props.EnumProperty(items=[
     ('BMESH', 'BMesh', 'BMesh', 0),
@@ -140,7 +141,9 @@ class CarveOp(bpy.types.Operator):
           bpy.data.meshes.remove(mesh)
       
       self.report({'ERROR'}, str(e))
-      raise e
+      traceback.print_exc()
+      
+      return {'CANCELLED'}
     
     finally:
       # Clean up intermediate objects that were created.
