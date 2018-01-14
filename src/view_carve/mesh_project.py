@@ -50,6 +50,8 @@ def carver_to_carve_obj(context, carver, view_point, view_dir, project_dist, con
   
   except Exception as e:
     # Try to clean up.
+    if 'carve_obj' in locals():
+      bpy.data.objects.remove(carve_obj)
     if 'carve_mesh' in locals():
       bpy.data.meshes.remove(carve_mesh)
     
@@ -98,8 +100,9 @@ def _curve_obj_to_face_pts(context, obj, convex_hull_curve):
   finally:
     # Clean up.
     if 'mesh_obj' in locals():
-      bpy.data.meshes.remove(mesh_obj.data)
+      mesh = mesh_obj.data
       bpy.data.objects.remove(mesh_obj)
+      bpy.data.meshes.remove(mesh)
       
 
 def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
@@ -156,10 +159,10 @@ def _mesh_obj_to_face_pts(context, obj, convex_hull_solid, convex_hull_curve):
       # Clean up.
       if 'old_mode' in locals():
         bpy.ops.object.mode_set(mode=old_mode)
-      if 'mesh_copy' in locals():
-        bpy.data.meshes.remove(mesh_copy)
       if 'temp_obj' in locals():
         bpy.data.objects.remove(temp_obj)
+      if 'mesh_copy' in locals():
+        bpy.data.meshes.remove(mesh_copy)
 
 def _path_mesh_obj_to_face_pts(context, obj, convex_hull_curve):
   """Converts a path-shaped Blender mesh object to a sequence of face points to project.
