@@ -1,3 +1,5 @@
+"""Blender addon Python module - Projection Carving Tool"""
+
 import bpy
 
 from . import ui
