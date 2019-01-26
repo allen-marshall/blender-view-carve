@@ -2,8 +2,7 @@
 
 import bpy
 
-from . import ui
-from . import carve_op
+from . import stencil_op
 
 bl_info = {
     'name': 'Projection Carving Tool',
@@ -15,7 +14,7 @@ bl_info = {
     'tracker_url': 'https://github.com/allen-marshall/blender-view-carve/issues',
 }
 
-register, unregister = bpy.utils.register_classes_factory((carve_op.CarveOp, ui.CarvePanel,))
+register, unregister = bpy.utils.register_classes_factory((stencil_op.VIEW_CARVE_OT_stencil,))
 
 if __name__ == '__main__':
     register()
