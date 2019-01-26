@@ -1,26 +1,19 @@
 import bpy
 
 from . import ui
-from view_carve import carve_op
+from . import carve_op
 
 bl_info = {
-  'name' : 'Projection Carving Tool',
-  'description' : 'Tool for carving a mesh object based on projections of curves in the 3D viewport',
-  'author' : 'Allen Marshall',
-  'version' : (0, 3),
-  'blender' : (2, 7, 9),
-  'category' : 'Mesh',
+    'name': 'Projection Carving Tool',
+    'description': 'Tool for carving a mesh object based on projections of other objects in the 3D viewport',
+    'author': 'Allen Marshall',
+    'version': (0, 4),
+    'blender': (2, 80, 0),
+    'category': 'Mesh',
+    'tracker_url': 'https://github.com/allen-marshall/blender-view-carve/issues',
 }
 
-classes_to_register = [carve_op.CarveOp, ui.CarvePanel,]
-
-def register():
-  for class_to_register in classes_to_register:
-    bpy.utils.register_class(class_to_register)
-
-def unregister():
-  for class_to_register in classes_to_register:
-    bpy.utils.unregister_class(class_to_register)
+register, unregister = bpy.utils.register_classes_factory((carve_op.CarveOp, ui.CarvePanel,))
 
 if __name__ == '__main__':
-  register()
+    register()
