@@ -1,4 +1,4 @@
-"""Utilities for projecting objects through the viewport."""
+"""Functionality for projecting objects through the viewport."""
 
 
 import bpy
@@ -14,93 +14,94 @@ import shapely.ops
 import triangle
 
 
-# TODO: Docstrings.
+def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_stencils):
+    """Projects the specified carver objects through the 3D viewport to get stencil meshes.
+    Warning: This function may change the selection state of objects in the scene.
+    Returns a list of newly created stencil mesh objects that have been linked to the scene. If union_stencils is true,
+    the returned list will contain only one stencil object.
+    Raises ValueError if the provided list of carvers contains objects with vertices that are currently behind the
+        viewport camera, or if Blender is not currently in Object Mode.
+    vp_proj_matrix - The viewport camera's projection matrix (in other words, a transformation matrix from world space
+        to the viewport camera's 3D space).
+    carvers - List of Blender objects indicating the carver objects to use.
+    delete_carvers - Boolean indicating whether the carver objects should be unlinked from the scene.
+    union_stencils - Boolean indicating whether to create a single unioned stencil (true), or a separate stencil for
+        each carver (false).
+    """
+    if bpy.context.mode != 'OBJECT':
+        raise ValueError('Not in Object Mode')
+
+    # Convert each carver object to a 2D stencil shape.
+    stencil_shapes = [_carver_to_stencil_shape(vp_proj_matrix, carver, delete_carvers) for carver in carvers]
+    stencil_shapes = [shape for shape in stencil_shapes if shape is not None]
+
+    # Union the 2D shapes if we are in union_stencils mode.
+    if union_stencils and len(stencil_shapes) > 0:
+        stencil_shapes = [shapely.ops.unary_union(stencil_shapes)]
+
+    # Convert each 2D stencil shape to a 3D stencil mesh.
+    vp_to_world_matrix = vp_proj_matrix.inverted()
+    stencil_mesh_objs = []
+    try:
+        for shape in stencil_shapes:
+            stencil_mesh_objs.append(_stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape))
+        return stencil_mesh_objs
+
+    except Exception as e:
+        # In case of error, try to clean up any partial results that were added to the scene.
+        for stencil_mesh_obj in stencil_mesh_objs:
+            bpy.data.objects.remove(stencil_mesh_obj)
+
+        raise e
 
 
-def objs_to_stencil_meshes(to_vp_matrix, objs, union_objs):
-    # TODO
-    pass
+def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver):
+    """Projects the specified carver object through the 3D viewport to get a 2D stencil shape.
+    Warning: This function may change the selection state of objects in the scene.
+    Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
+    could be derived, e.g. if the carver is an empty mesh.
+    Raises ValueError if the carver has vertices that are currently behind the viewport camera, or if Blender is not
+    currently in Object Mode.
+    vp_proj_matrix - The viewport camera's projection matrix (in other words, a transformation matrix from world space
+        to the viewport camera's 3D space).
+    carver - A Blender object indicating the carver geometry to use.
+    delete_carver - Boolean indicating whether the carver object should be unlinked from the scene.
+    """
+    if bpy.context.mode != 'OBJECT':
+        raise ValueError('Not in Object Mode')
 
-
-def _obj_to_stencil_shape(to_vp_matrix, obj):
-    # TODO: Clean up extra meshes and BMeshes created in this function.
-
-    # Get the object's shape data as a BMesh.
-    if obj.type != 'MESH':
+    # If the carver is not a mesh object, convert it to a mesh object, deleting the original object if delete_carver is
+    # true.
+    carver_was_mesh = carver.type == 'MESH'
+    if not carver_was_mesh:
         bpy.ops.object.select_all(action='DESELECT')
-        obj.select = True
-        bpy.context.scene.objects.active = obj
-        bpy.ops.object.convert(target='MESH', keep_original=True)
-        mesh_obj = bpy.context.scene.objects.active
-        if mesh_obj.type != 'MESH':
-            # TODO: Probably raise an exception.
-            return None
-        bmesh_data = bmesh.new()
-        bmesh_data.from_mesh(mesh_obj.data)
+        carver.select = True
+        bpy.context.scene.objects.active = carver
+        convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
+        if convert_result != {'FINISHED'}:
+            raise ValueError('Failed to convert carver to mesh')
+        carver_mesh_obj = bpy.context.scene.objects.active
     else:
-        bmesh_data = bmesh.new()
-        bmesh_data.from_mesh(obj.data)
+        carver_mesh_obj = carver
 
-    # Convert the BMesh to a stencil shape.
-    return _bmesh_to_stencil_shape(to_vp_matrix * obj.matrix_world, bmesh_data)
+    try:
+        # Convert the mesh to a 2D stencil shape.
+        return _carver_mesh_to_stencil_shape(vp_proj_matrix * carver_mesh_obj.matrix_world, carver_mesh_obj.data)
 
-
-def _stencil_shape_to_bmesh(from_vp_matrix, shape):
-    # Triangulate the stencil shape.
-    triangulated_shape = _triangulate_stencil_shape(shape)
-
-    vertices_2d = triangulated_shape['vertices'].tolist()
-    triangles_2d = triangulated_shape['triangles'].tolist()
-
-    # Build the 3D vertices.
-    vertices = [_vp_plane_project_pt_inv(from_vp_matrix, pt, True) for pt in vertices_2d] \
-        + [_vp_plane_project_pt_inv(from_vp_matrix, pt, False) for pt in vertices_2d]
-
-    # TODO: Build the 3D edges and faces, then build the BMesh.
-
-def _triangulate_stencil_shape(shape):
-    # Convert the stencil shape to the format required by the triangle library.
-
-    vertices = ordered_set.OrderedSet()
-    segments = ordered_set.OrderedSet()
-    hole_pts = ordered_set.OrderedSet()
-
-    def add_segments(coords_list):
-        for idx in range(len(coords_list) - 1):
-            segments.add((vertices.index(coords_list[idx]), vertices.index(coords_list[idx + 1])))
-
-    if not isinstance(shape, (GeometryCollection, MultiPolygon)):
-        shape = GeometryCollection([shape])
-    for geom in shape:
-        if isinstance(geom, Polygon):
-            # Add vertices.
-            for point in geom.exterior.coords:
-                vertices.add(point)
-            for interior in geom.interiors:
-                for point in interior.coords:
-                    vertices.add(point)
-
-            # Add segments.
-            add_segments(geom.exterior.coords)
-            for interior in geom.interiors:
-                add_segments(interior.coords)
-
-            # Add holes.
-            for interior in geom.interiors:
-                interior_polygon = Polygon(interior.coords)
-                hole_pts.add(interior_polygon.representative_point())
-
-    shape_for_triangle_lib = {
-        'vertices': vertices,
-        'segments': segments,
-        'holes': hole_pts
-    }
-
-    # Perform the triangulation.
-    return triangle.triangulate(shape_for_triangle_lib, 'p')
+    # Clean up the carver mesh object if appropriate.
+    finally:
+        if delete_carver or not carver_was_mesh:
+            bpy.data.objects.remove(carver_mesh_obj)
 
 
-def _bmesh_to_stencil_shape(to_vp_matrix, mesh):
+def _carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+    """Projects the specified carver mesh through the 3D viewport to get a 2D stencil shape.
+    Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
+    could be derived, e.g. if the carver mesh is empty.
+    Raises ValueError if the carver has vertices that are currently behind the viewport camera.
+    to_vp_matrix - Transformation matrix from the mesh object's local 3D space to the viewport's 3D space.
+    carver_mesh - A Blender mesh indicating the carver geometry to use.
+    """
     return _faceless_bmesh_to_stencil_shape(to_vp_matrix, mesh) if len(mesh.faces) <= 0 \
         else _faced_bmesh_to_stencil_shape(to_vp_matrix, mesh)
 
@@ -174,6 +175,77 @@ def _follow_edges(start_vert, start_edge):
         return False, pts
     else:
         return True, pts
+
+
+def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape):
+    """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
+    Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None.
+    from_vp_matrix - Transformation matrix from the viewport's 3D space to world space.
+    shape - The shape to convert, as returned by _carver_to_stencil_shape.
+    """
+    if shape is None:
+        return None
+
+    # Triangulate the stencil shape.
+    triangulated_shape = _triangulate_stencil_shape(shape)
+    vertices_2d = triangulated_shape['vertices'].tolist()
+    triangles_2d = triangulated_shape['triangles'].tolist()
+
+    # Build the 3D vertices.
+    vertices = [_vp_plane_project_pt_inv(from_vp_matrix, pt, True) for pt in vertices_2d] \
+               + [_vp_plane_project_pt_inv(from_vp_matrix, pt, False) for pt in vertices_2d]
+
+    # TODO: Build the 3D edges and faces, then build the mesh object.
+
+
+def _triangulate_stencil_shape(shape):
+    """Converts a 2D stencil shape as returned by _carver_to_stencil_shape into a triangulated form.
+    Intended for use in constructing stencil meshes from 2D stencil shapes.
+    Returns the triangulated shape in the format used by the triangle library. Returns None if shape is None.
+    shape - The 2D stencil shape to convert.
+    """
+    if shape is None:
+        return None
+
+    # Convert the stencil shape to the format required by the triangle library.
+
+    vertices = ordered_set.OrderedSet()
+    segments = ordered_set.OrderedSet()
+    hole_pts = ordered_set.OrderedSet()
+
+    def add_segments(coords_list):
+        for idx in range(len(coords_list) - 1):
+            segments.add((vertices.index(coords_list[idx]), vertices.index(coords_list[idx + 1])))
+
+    if not isinstance(shape, (GeometryCollection, MultiPolygon)):
+        shape = GeometryCollection([shape])
+    for geom in shape:
+        if isinstance(geom, Polygon):
+            # Add vertices.
+            for point in geom.exterior.coords:
+                vertices.add(point)
+            for interior in geom.interiors:
+                for point in interior.coords:
+                    vertices.add(point)
+
+            # Add segments.
+            add_segments(geom.exterior.coords)
+            for interior in geom.interiors:
+                add_segments(interior.coords)
+
+            # Add holes.
+            for interior in geom.interiors:
+                interior_polygon = Polygon(interior.coords)
+                hole_pts.add(interior_polygon.representative_point())
+
+    shape_for_triangle_lib = {
+        'vertices': vertices,
+        'segments': segments,
+        'holes': hole_pts
+    }
+
+    # Perform the triangulation.
+    return triangle.triangulate(shape_for_triangle_lib, 'p')
 
 
 def _vp_plane_project_pt(to_vp_matrix, pt):
