@@ -1,6 +1,8 @@
 """Functionality for projecting objects through the viewport."""
 
 
+import collections
+
 import bpy
 import bmesh
 import mathutils
@@ -48,7 +50,7 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         return stencil_mesh_objs
 
     except Exception as e:
-        # In case of error, try to clean up any partial results that were added to the scene.
+        # In case of error, try to clean up any partial results owned by Blender.
         for stencil_mesh_obj in stencil_mesh_objs:
             bpy.data.objects.remove(stencil_mesh_obj)
 
@@ -188,16 +190,59 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape):
     if shape is None:
         return None
 
-    # Triangulate the stencil shape.
+    # Triangulate the stencil shape so we don't have to worry about holes in polygons.
     triangulated_shape = _triangulate_stencil_shape(shape)
     vertices_2d = triangulated_shape['vertices'].tolist()
     triangles_2d = triangulated_shape['triangles'].tolist()
+    num_vertices_2d = len(vertices_2d)
 
     # Build the 3D vertices.
     vertices = [_vp_plane_project_pt_inv(from_vp_matrix, pt, True) for pt in vertices_2d] \
-               + [_vp_plane_project_pt_inv(from_vp_matrix, pt, False) for pt in vertices_2d]
+        + [_vp_plane_project_pt_inv(from_vp_matrix, pt, False) for pt in vertices_2d]
 
-    # TODO: Build the 3D edges and faces, then build the mesh object.
+    # Build the faces for the near-camera and far-from-camera parts of the mesh.
+    faces = triangles_2d \
+        + [(tri[0] + num_vertices_2d, tri[1] + num_vertices_2d, tri[2] + num_vertices_2d) for tri in triangles_2d]
+
+    # Find the 2D edges, and count the number of (triangular) faces attached to each edge. Edges with only one face are
+    # boundary edges of the shape and will require bridge faces in the 3D mesh.
+    edge_counts = collections.Counter()
+    for tri in triangles_2d:
+        edge_0 = {tri[0], tri[1]}
+        edge_1 = {tri[1], tri[2]}
+        edge_2 = {tri[2], tri[0]}
+        edge_counts.update((edge_0, edge_1, edge_2))
+
+    # Build the 3D edges and the faces that bridge the near-camera and far-from-camera parts of the mesh.
+    edges = []
+    for edge_set, count in edge_counts.items():
+        edge = tuple(edge_set)
+        edges.append(edge)
+        if count > 1:
+            faces.append((edge[0], edge[1], edge[1] + num_vertices_2d, edge[0] + num_vertices_2d))
+
+    # Build a Blender mesh object from the computed geometry data, freeing the Python data as early as possible.
+
+    mesh = bpy.data.meshes.new('viewCarveTemp_stencilMesh')
+    mesh_obj = None
+    try:
+        mesh.from_pydata(vertices, edges, faces)
+        mesh.calc_normals_split()
+        mesh.update()
+        if not mesh.validate():
+            raise ValueError('Somehow created invalid mesh; cannot continue')
+
+        mesh_obj = bpy.data.objects.new('viewCarveTemp_stencilMeshObj', mesh)
+        bpy.context.scene.objects.link(mesh_obj)
+        return mesh_obj
+
+    except Exception as e:
+        # In case of error, try to clean up any partial results owned by Blender.
+        if mesh_obj is not None:
+            bpy.data.objects.remove(mesh_obj)
+        bpy.data.meshes.remove(mesh)
+
+        raise e
 
 
 def _triangulate_stencil_shape(shape):
