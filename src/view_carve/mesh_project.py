@@ -104,29 +104,40 @@ def _carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
     to_vp_matrix - Transformation matrix from the mesh object's local 3D space to the viewport's 3D space.
     carver_mesh - A Blender mesh indicating the carver geometry to use.
     """
-    # TODO: Fix this function.
-    # return _faceless_bmesh_to_stencil_shape(to_vp_matrix, mesh) if len(mesh.faces) <= 0 \
-    #     else _faced_bmesh_to_stencil_shape(to_vp_matrix, mesh)
-    pass
+    return _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh) if len(carver_mesh.polygons) <= 0 \
+        else _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh)
 
 
-# def _faced_bmesh_to_stencil_shape(to_vp_matrix, mesh):
-#     # Convert individual faces into stencil shapes.
-#     def face_to_stencil_shape(face):
-#         vert_coords = [_vp_plane_project_pt(to_vp_matrix, vert.co) for vert in face.verts]
-#         return Polygon(vert_coords)
-#     face_stencil_shapes = [face_to_stencil_shape(face) for face in mesh.faces]
-#
-#     # Filter out any invalid face shapes. (These can arise e.g. from non-planar faces.)
-#     face_stencil_shapes = [shape for shape in face_stencil_shapes if shape.is_valid()]
-#
-#     # Union the face shapes together.
-#     stencil_shape = shapely.ops.unary_union(face_stencil_shapes)
-#
-#     return stencil_shape if stencil_shape.is_valid() else None
-#
-#
-# def _faceless_bmesh_to_stencil_shape(to_vp_matrix, mesh):
+def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+    """Same as _carver_mesh_to_stencil_shape, but only for meshes that have at least one face."""
+    # Convert individual faces into stencil shapes.
+
+    def face_to_stencil_shape(face):
+        vert_coords_3d = [carver_mesh.vertices[carver_mesh.loops[loop_idx].vertex_index]
+                          for loop_idx in face.loop_indices]
+        vert_coords = [_vp_plane_project_pt(to_vp_matrix, vert) for vert in vert_coords_3d]
+        return Polygon(vert_coords)
+
+    face_stencil_shapes = [face_to_stencil_shape(face) for face in carver_mesh.polygons]
+
+    # Filter out any invalid 2D face shapes. (These can arise e.g. from non-planar faces.)
+    face_stencil_shapes = [shape for shape in face_stencil_shapes if shape.is_valid()]
+
+    if len(face_stencil_shapes) <= 0:
+        return None
+
+    # Union the face shapes together.
+    stencil_shape = shapely.ops.unary_union(face_stencil_shapes)
+
+    return stencil_shape if stencil_shape.is_valid() else None
+
+
+def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+    """Same as _carver_mesh_to_stencil_shape, but only for meshes with no faces."""
+    # TODO
+    return None
+
+# def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, mesh):
 #     # Try to extract an open or closed path from the mesh by following edges starting from an arbitrary vertex.
 #     if len(list(mesh.verts)) <= 0:
 #         return None
