@@ -117,7 +117,7 @@ def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
     # Convert individual faces into stencil shapes.
 
     def face_to_stencil_shape(face):
-        vert_coords_3d = [carver_mesh.vertices[carver_mesh.loops[loop_idx].vertex_index]
+        vert_coords_3d = [carver_mesh.vertices[carver_mesh.loops[loop_idx].vertex_index].co
                           for loop_idx in face.loop_indices]
         vert_coords = [_vp_plane_project_pt(to_vp_matrix, vert) for vert in vert_coords_3d]
         return Polygon(vert_coords)
