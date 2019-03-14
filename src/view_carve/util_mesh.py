@@ -18,5 +18,5 @@ def apply_boolean_op(context, target, obj, operation, double_threshold):
     mod.operation = operation
     mod.object = obj
     mod.double_threshold = double_threshold
-    context.scene.objects.active = target
+    context.view_layer.objects.active = target
     bpy.ops.object.modifier_apply(modifier=mod.name)
