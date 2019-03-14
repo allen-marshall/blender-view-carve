@@ -46,15 +46,19 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
         if context is None \
                 or not hasattr(context, 'region_data') or context.region_data is None \
                 or not hasattr(context, 'scene') or context.scene is None \
-                or not hasattr(context.scene, 'objects') or context.scene.objects is None \
-                or not hasattr(context.scene.objects, 'active') or context.scene.objects.active is None \
+                or not hasattr(context.scene, 'collection') or context.scene.collection is None \
+                or not hasattr(context.scene.collection, 'objects') or context.scene.collection.objects is None \
+                or not hasattr(context, 'view_layer') or context.view_layer is None \
+                or not hasattr(context.view_layer, 'objects') or context.view_layer.objects is None \
+                or not hasattr(context.view_layer.objects, 'active') or context.view_layer.objects.active is None \
                 or not hasattr(context, 'selected_objects') or context.selected_objects is None \
                 or len(list(context.selected_objects)) < 2 \
                 or not hasattr(context, 'mode') or context.mode != 'OBJECT':
             return False
 
         # Make sure the carve target (active object) is a mesh object with no modifiers.
-        if context.scene.objects.active.type != 'MESH' or len(list(context.scene.objects.active.modifiers)) != 0:
+        if context.view_layer.objects.active.type != 'MESH' \
+                or len(list(context.view_layer.objects.active.modifiers)) != 0:
             return False
 
         # TODO: Make sure all selected objects can be converted to meshes?
@@ -66,7 +70,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
         stencil_mesh_objs = []
         try:
             # Find the carver objects.
-            orig_target = context.scene.objects.active
+            orig_target = context.view_layer.objects.active
             carver_objs = [obj for obj in list(context.selected_objects) if obj is not orig_target]
 
             # Create stencil mesh objects from the carver objects. (Only one stencil mesh will be created if we are in
@@ -106,7 +110,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 new_obj.select = True
             if orig_target is not None:
                 orig_target.select = True
-            context.scene.objects.active = orig_target
+            context.view_layer.objects.active = orig_target
 
             return {'FINISHED'}
 
@@ -147,7 +151,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             # If we are not in Subtract Only mode, create a new object and apply the opposite boolean modifier.
             if not self.prop_subtract_only:
                 new_target = bpy.data.objects.new(base_target_name, target_data_copy)
-                context.scene.objects.link(new_target)
+                context.scene.collection.objects.link(new_target)
 
                 util_mesh.apply_boolean_op(context, new_target, stencil_mesh_obj, 'INTERSECT', _BOOLEAN_OP_THRESHOLD)
 

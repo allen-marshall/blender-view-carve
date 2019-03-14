@@ -80,11 +80,11 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
     if not carver_was_mesh:
         bpy.ops.object.select_all(action='DESELECT')
         carver.select = True
-        context.scene.objects.active = carver
+        context.view_layer.objects.active = carver
         convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
         if convert_result != {'FINISHED'}:
             raise ValueError('Failed to convert carver to mesh')
-        carver_mesh_obj = context.scene.objects.active
+        carver_mesh_obj = context.view_layer.objects.active
     else:
         carver_mesh_obj = carver
 
@@ -247,7 +247,7 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
             raise ValueError('Somehow created invalid mesh; cannot continue')
 
         mesh_obj = bpy.data.objects.new('viewCarveTemp_stencilMeshObj', mesh)
-        context.scene.objects.link(mesh_obj)
+        context.scene.collection.objects.link(mesh_obj)
         return mesh_obj
 
     except Exception as e:
