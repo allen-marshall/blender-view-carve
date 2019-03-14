@@ -125,7 +125,7 @@ def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
     face_stencil_shapes = [face_to_stencil_shape(face) for face in carver_mesh.polygons]
 
     # Filter out any invalid 2D face shapes. (These can arise e.g. from non-planar faces.)
-    face_stencil_shapes = [shape for shape in face_stencil_shapes if shape.is_valid()]
+    face_stencil_shapes = [shape for shape in face_stencil_shapes if shape.is_valid]
 
     if len(face_stencil_shapes) <= 0:
         return None
@@ -133,7 +133,7 @@ def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
     # Union the face shapes together.
     stencil_shape = shapely.ops.unary_union(face_stencil_shapes)
 
-    return stencil_shape if stencil_shape.is_valid() else None
+    return stencil_shape if stencil_shape.is_valid else None
 
 
 def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
@@ -166,7 +166,7 @@ def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
 #     # a self-intersecting path.
 #     stencil_shape = Polygon(pts)
 #
-#     return stencil_shape if stencil_shape.is_valid() else None
+#     return stencil_shape if stencil_shape.is_valid else None
 #
 #
 # def _follow_edges(start_vert, start_edge):
