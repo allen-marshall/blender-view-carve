@@ -16,7 +16,7 @@ import shapely.ops
 import triangle
 
 
-def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_stencils):
+def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_stencils, context):
     """Projects the specified carver objects through the 3D viewport to get stencil meshes.
     Warning: This function may change the selection state of objects in the scene.
     Returns a list of newly created stencil mesh objects that have been linked to the scene. If union_stencils is true,
@@ -29,8 +29,9 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
     delete_carvers - Boolean indicating whether the carver objects should be unlinked from the scene.
     union_stencils - Boolean indicating whether to create a single unioned stencil (true), or a separate stencil for
         each carver (false).
+    context - The Blender context.
     """
-    if bpy.context.mode != 'OBJECT':
+    if context.mode != 'OBJECT':
         raise ValueError('Not in Object Mode')
 
     # Convert each carver object to a 2D stencil shape.
@@ -46,7 +47,7 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
     stencil_mesh_objs = []
     try:
         for shape in stencil_shapes:
-            stencil_mesh_objs.append(_stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape))
+            stencil_mesh_objs.append(_stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape, context))
         return stencil_mesh_objs
 
     except Exception as e:
@@ -57,7 +58,7 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         raise e
 
 
-def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver):
+def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
     """Projects the specified carver object through the 3D viewport to get a 2D stencil shape.
     Warning: This function may change the selection state of objects in the scene.
     Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
@@ -68,8 +69,9 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver):
         to the viewport camera's 3D space).
     carver - A Blender object indicating the carver geometry to use.
     delete_carver - Boolean indicating whether the carver object should be unlinked from the scene.
+    context - The Blender context.
     """
-    if bpy.context.mode != 'OBJECT':
+    if context.mode != 'OBJECT':
         raise ValueError('Not in Object Mode')
 
     # If the carver is not a mesh object, convert it to a mesh object, deleting the original object if delete_carver is
@@ -78,11 +80,11 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver):
     if not carver_was_mesh:
         bpy.ops.object.select_all(action='DESELECT')
         carver.select = True
-        bpy.context.scene.objects.active = carver
+        context.scene.objects.active = carver
         convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
         if convert_result != {'FINISHED'}:
             raise ValueError('Failed to convert carver to mesh')
-        carver_mesh_obj = bpy.context.scene.objects.active
+        carver_mesh_obj = context.scene.objects.active
     else:
         carver_mesh_obj = carver
 
@@ -192,11 +194,12 @@ def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
 #         return True, pts
 
 
-def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape):
+def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
     Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None.
     from_vp_matrix - Transformation matrix from the viewport's 3D space to world space.
     shape - The shape to convert, as returned by _carver_to_stencil_shape.
+    context - The Blender context.
     """
     if shape is None:
         return None
@@ -244,7 +247,7 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape):
             raise ValueError('Somehow created invalid mesh; cannot continue')
 
         mesh_obj = bpy.data.objects.new('viewCarveTemp_stencilMeshObj', mesh)
-        bpy.context.scene.objects.link(mesh_obj)
+        context.scene.objects.link(mesh_obj)
         return mesh_obj
 
     except Exception as e:
