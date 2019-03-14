@@ -50,8 +50,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 or not hasattr(context.scene.objects, 'active') or context.scene.objects.active is None \
                 or not hasattr(context, 'selected_objects') or context.selected_objects is None \
                 or len(list(context.selected_objects)) < 2 \
-                or not hasattr(context, 'mode') or context.mode != 'OBJECT' \
-                or context.scene.objects.active.type != 'MESH':
+                or not hasattr(context, 'mode') or context.mode != 'OBJECT':
             return False
 
         # Make sure the carve target (active object) is a mesh object with no modifiers.
