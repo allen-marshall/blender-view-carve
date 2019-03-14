@@ -328,7 +328,7 @@ def _vp_plane_project_pt(to_vp_matrix, pt):
         the object from which the input point was derived.
     pt - 3D input point to project, as a 3-tuple of numbers.
     """
-    projected_pt = to_vp_matrix * mathutils.Vector((pt[0], pt[1], pt[2], 1))
+    projected_pt = to_vp_matrix @ mathutils.Vector((pt[0], pt[1], pt[2], 1))
     if projected_pt[2] > 0:
         raise ValueError('Carver object is behind the viewport camera')
     return projected_pt[0], projected_pt[1]
