@@ -14,6 +14,9 @@ def apply_boolean_op(context, target, obj, operation, double_threshold):
     operation - Operation parameter for the boolean modifier.
     double_threshold - Threshold parameter for the boolean modifier.
     """
+    if context.mode != 'OBJECT':
+        raise ValueError('Not in Object Mode')
+
     mod = target.modifiers.new('viewCarveTemp_modifier', 'BOOLEAN')
     mod.operation = operation
     mod.object = obj
