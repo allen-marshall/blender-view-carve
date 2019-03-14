@@ -92,7 +92,7 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
 
     try:
         # Convert the mesh to a 2D stencil shape.
-        return _carver_mesh_to_stencil_shape(vp_proj_matrix * carver_mesh_obj.matrix_world, carver_mesh_obj.data)
+        return _carver_mesh_to_stencil_shape(vp_proj_matrix @ carver_mesh_obj.matrix_world, carver_mesh_obj.data)
 
     # Clean up the carver mesh object if appropriate.
     finally:
@@ -345,5 +345,5 @@ def _vp_plane_project_pt_inv(from_vp_matrix, pt, close_to_cam):
         the viewport camera (false).
     """
     vp_coord_z = 0 if close_to_cam else -1
-    output_vec = from_vp_matrix * mathutils.Vector((pt[0], pt[1], vp_coord_z, 1))
+    output_vec = from_vp_matrix @ mathutils.Vector((pt[0], pt[1], vp_coord_z, 1))
     return output_vec[0], output_vec[1], output_vec[2]
