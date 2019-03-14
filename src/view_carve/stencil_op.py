@@ -107,9 +107,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             # Set the final selection to something that makes sense for the operation.
             bpy.ops.object.select_all(action='DESELECT')
             for new_obj in new_objs:
-                new_obj.select = True
+                new_obj.select_set(True)
             if orig_target is not None:
-                orig_target.select = True
+                orig_target.select_set(True)
             context.view_layer.objects.active = orig_target
 
             return {'FINISHED'}

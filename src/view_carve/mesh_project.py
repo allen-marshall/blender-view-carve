@@ -81,7 +81,7 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
     carver_was_mesh = carver.type == 'MESH'
     if not carver_was_mesh:
         bpy.ops.object.select_all(action='DESELECT')
-        carver.select = True
+        carver.select_set(True)
         context.view_layer.objects.active = carver
         convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
         if convert_result != {'FINISHED'}:
