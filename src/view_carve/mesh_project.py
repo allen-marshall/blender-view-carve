@@ -35,7 +35,7 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         raise ValueError('Not in Object Mode')
 
     # Convert each carver object to a 2D stencil shape.
-    stencil_shapes = [_carver_to_stencil_shape(vp_proj_matrix, carver, delete_carvers) for carver in carvers]
+    stencil_shapes = [_carver_to_stencil_shape(vp_proj_matrix, carver, delete_carvers, context) for carver in carvers]
     stencil_shapes = [shape for shape in stencil_shapes if shape is not None]
 
     # Union the 2D shapes if we are in union_stencils mode.
