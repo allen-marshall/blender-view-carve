@@ -329,7 +329,7 @@ def _vp_plane_project_pt(to_vp_matrix, pt):
     pt - 3D input point to project, as a 3-tuple of numbers.
     """
     projected_pt = to_vp_matrix @ mathutils.Vector((pt[0], pt[1], pt[2], 1))
-    if projected_pt[2] > 0:
+    if projected_pt[2] < 0:
         raise ValueError('Carver object is behind the viewport camera')
     return projected_pt[0], projected_pt[1]
 
@@ -344,6 +344,6 @@ def _vp_plane_project_pt_inv(from_vp_matrix, pt, close_to_cam):
     close_to_cam - Boolean indicating whether the output point should be close to the viewport camera (true) or far from
         the viewport camera (false).
     """
-    vp_coord_z = 0 if close_to_cam else -1
+    vp_coord_z = 0 if close_to_cam else 1
     output_vec = from_vp_matrix @ mathutils.Vector((pt[0], pt[1], vp_coord_z, 1))
     return output_vec[0], output_vec[1], output_vec[2]
