@@ -47,7 +47,9 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
     stencil_mesh_objs = []
     try:
         for shape in stencil_shapes:
-            stencil_mesh_objs.append(_stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape, context))
+            stencil_mesh_obj = _stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape, context)
+            if stencil_mesh_obj is not None:
+                stencil_mesh_objs.append(stencil_mesh_obj)
         return stencil_mesh_objs
 
     except Exception as e:
@@ -196,7 +198,8 @@ def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
 
 def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
-    Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None.
+    Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None or
+    cannot be converted to a stencil mesh.
     from_vp_matrix - Transformation matrix from the viewport's 3D space to world space.
     shape - The shape to convert, as returned by _carver_to_stencil_shape.
     context - The Blender context.
@@ -206,6 +209,8 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
 
     # Triangulate the stencil shape so we don't have to worry about holes in polygons.
     triangulated_shape = _triangulate_stencil_shape(shape)
+    if triangulated_shape is None:
+        return None
     vertices_2d = triangulated_shape['vertices'].tolist()
     triangles_2d = triangulated_shape['triangles'].tolist()
     num_vertices_2d = len(vertices_2d)
@@ -262,7 +267,8 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
 def _triangulate_stencil_shape(shape):
     """Converts a 2D stencil shape as returned by _carver_to_stencil_shape into a triangulated form.
     Intended for use in constructing stencil meshes from 2D stencil shapes.
-    Returns the triangulated shape in the format used by the triangle library. Returns None if shape is None.
+    Returns the triangulated shape in the format used by the triangle library, or None if the shape cannot be
+    triangulated.
     shape - The 2D stencil shape to convert.
     """
     if shape is None:
@@ -299,11 +305,15 @@ def _triangulate_stencil_shape(shape):
                 interior_polygon = Polygon(interior.coords)
                 hole_pts.add(interior_polygon.representative_point())
 
+    if len(vertices) <= 0 or len(segments) <= 0:
+        return None
+
     shape_for_triangle_lib = {
-        'vertices': vertices,
-        'segments': segments,
-        'holes': hole_pts
+        'vertices': [list(vert) for vert in vertices],
+        'segments': [list(seg) for seg in segments]
     }
+    if len(hole_pts) > 0:
+        shape_for_triangle_lib['holes'] = [list(hole) for hole in hole_pts]
 
     # Perform the triangulation.
     return triangle.triangulate(shape_for_triangle_lib, 'p')
