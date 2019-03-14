@@ -227,9 +227,9 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     # boundary edges of the shape and will require bridge faces in the 3D mesh.
     edge_counts = collections.Counter()
     for tri in triangles_2d:
-        edge_0 = {tri[0], tri[1]}
-        edge_1 = {tri[1], tri[2]}
-        edge_2 = {tri[2], tri[0]}
+        edge_0 = frozenset((tri[0], tri[1]))
+        edge_1 = frozenset((tri[1], tri[2]))
+        edge_2 = frozenset((tri[2], tri[0]))
         edge_counts.update((edge_0, edge_1, edge_2))
 
     # Build the 3D edges and the faces that bridge the near-camera and far-from-camera parts of the mesh.
