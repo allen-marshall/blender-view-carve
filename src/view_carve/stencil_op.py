@@ -25,14 +25,14 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     prop_delete_carvers - If true, the objects used for carving will be deleted. Default: False
     """
     # Blender operator properties.
-    prop_subtract_only = bpy.props.BoolProperty(name='Subtract Only',
-                                                description='Subtract geometry instead of splitting into multiple objects',
-                                                default=False)
-    prop_union_carves = bpy.props.BoolProperty(name='Union Carves',
-                                               description='Make a single combined carve from all carver objects',
+    prop_subtract_only: bpy.props.BoolProperty(name='Subtract Only',
+                                               description='Subtract geometry instead of splitting into multiple objects',
                                                default=False)
-    prop_delete_carvers = bpy.props.BoolProperty(name='Delete Carver Objects',
-                                                 description='Delete objects used for carving', default=False)
+    prop_union_carves: bpy.props.BoolProperty(name='Union Carves',
+                                              description='Make a single combined carve from all carver objects',
+                                              default=False)
+    prop_delete_carvers: bpy.props.BoolProperty(name='Delete Carver Objects',
+                                                description='Delete objects used for carving', default=False)
 
     # Blender metadata.
     bl_idname = 'view_carve.stencil'
