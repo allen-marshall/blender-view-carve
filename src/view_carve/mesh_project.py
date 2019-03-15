@@ -237,7 +237,7 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     for edge_set, count in edge_counts.items():
         edge = tuple(edge_set)
         edges.append(edge)
-        if count > 1:
+        if count == 1:
             faces.append((edge[0], edge[1], edge[1] + num_vertices_2d, edge[0] + num_vertices_2d))
 
     # Build a Blender mesh object from the computed geometry data, freeing the Python data as early as possible.
