@@ -324,7 +324,8 @@ def _triangulate_stencil_shape(shape):
             # Add holes.
             for interior in geom.interiors:
                 interior_polygon = Polygon(interior.coords)
-                hole_pts.add(interior_polygon.representative_point())
+                hole_pt = interior_polygon.representative_point()
+                hole_pts.add((hole_pt.x, hole_pt.y))
 
     if len(vertices) <= 0 or len(segments) <= 0:
         return None
