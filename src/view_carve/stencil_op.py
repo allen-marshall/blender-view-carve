@@ -115,11 +115,6 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                     bpy.data.objects.remove(target)
                     new_objs.remove(target)
 
-            # Delete carver objects if we are in Delete Carver Objects mode.
-            if self.prop_delete_carvers:
-                for carver in carver_objs:
-                    bpy.data.objects.remove(carver)
-
             # Set the final selection to something that makes sense for the operation.
             bpy.ops.object.select_all(action='DESELECT')
             for new_obj in new_objs:
