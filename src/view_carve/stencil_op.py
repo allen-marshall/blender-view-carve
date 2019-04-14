@@ -2,7 +2,10 @@
 
 import traceback
 
+import math
+
 import bpy
+import mathutils
 
 from . import util_mesh
 from . import mesh_project
@@ -11,6 +14,9 @@ from . import mesh_project
 # Threshold to use for finding overlapping geometry in boolean operations.
 # TODO: Make this configurable?
 _BOOLEAN_OP_THRESHOLD = 0.000001
+
+# Extra projection distance added to ensure that stencil meshes completely cut through the target object.
+_PROJECT_DIST_PADDING = 1
 
 
 class VIEW_CARVE_OT_stencil(bpy.types.Operator):
@@ -73,11 +79,21 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             orig_target = context.view_layer.objects.active
             carver_objs = [obj for obj in list(context.selected_objects) if obj is not orig_target]
 
+            # Determine where the viewport camera is in world space.
+            view_matrix_inv = context.region_data.view_matrix.inverted()
+            cam_pt = (view_matrix_inv @ mathutils.Vector((0, 0, 0, 1))).to_3d()
+
+            # Determine projection distance required to make the stencil meshes cut through the active object.
+            bb_pts = [mathutils.Vector(bb_pt) for bb_pt in orig_target.bound_box]
+            project_dist = math.sqrt(max([(bb_pt - cam_pt).length_squared for bb_pt in bb_pts])) + _PROJECT_DIST_PADDING
+
             # Create stencil mesh objects from the carver objects. (Only one stencil mesh will be created if we are in
             # Union Carves mode.)
-            stencil_mesh_objs = mesh_project.carvers_to_stencil_meshes(context.region_data.perspective_matrix,
-                                                                       carver_objs, self.prop_delete_carvers,
-                                                                       self.prop_union_carves, context)
+            stencil_mesh_objs = mesh_project.carvers_to_stencil_meshes(context.region_data.view_matrix,
+                                                                       not context.region_data.is_perspective,
+                                                                       project_dist, carver_objs,
+                                                                       self.prop_delete_carvers, self.prop_union_carves,
+                                                                       context)
 
             # Apply each stencil mesh.
             target_name = orig_target.name

@@ -16,15 +16,18 @@ import shapely.ops
 import triangle
 
 
-def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_stencils, context):
+def carvers_to_stencil_meshes(vp_view_matrix, is_orthographic, far_dist, carvers, delete_carvers, union_stencils,
+                              context):
     """Projects the specified carver objects through the 3D viewport to get stencil meshes.
     Warning: This function may change the selection state of objects in the scene.
     Returns a list of newly created stencil mesh objects that have been linked to the scene. If union_stencils is true,
     the returned list will contain only one stencil object.
     Raises ValueError if the provided list of carvers contains objects with vertices that are currently behind the
         viewport camera, or if Blender is not currently in Object Mode.
-    vp_proj_matrix - The viewport camera's projection matrix (in other words, a transformation matrix from world space
+    vp_view_matrix - The viewport camera's view matrix (in other words, a transformation matrix from world space
         to the viewport camera's 3D space).
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
+    far_dist - Minimum distance from the camera that the 'far' part of the stencil mesh needs to have.
     carvers - List of Blender objects indicating the carver objects to use.
     delete_carvers - Boolean indicating whether the carver objects should be unlinked from the scene.
     union_stencils - Boolean indicating whether to create a single unioned stencil (true), or a separate stencil for
@@ -35,7 +38,8 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         raise ValueError('Not in Object Mode')
 
     # Convert each carver object to a 2D stencil shape.
-    stencil_shapes = [_carver_to_stencil_shape(vp_proj_matrix, carver, delete_carvers, context) for carver in carvers]
+    stencil_shapes = [_carver_to_stencil_shape(vp_view_matrix, is_orthographic, carver, delete_carvers, context)
+                      for carver in carvers]
     stencil_shapes = [shape for shape in stencil_shapes if shape is not None]
 
     # Union the 2D shapes if we are in union_stencils mode.
@@ -43,11 +47,12 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         stencil_shapes = [shapely.ops.unary_union(stencil_shapes)]
 
     # Convert each 2D stencil shape to a 3D stencil mesh.
-    vp_to_world_matrix = vp_proj_matrix.inverted()
+    vp_to_world_matrix = vp_view_matrix.inverted()
     stencil_mesh_objs = []
     try:
         for shape in stencil_shapes:
-            stencil_mesh_obj = _stencil_shape_to_stencil_mesh(vp_to_world_matrix, shape, context)
+            stencil_mesh_obj = _stencil_shape_to_stencil_mesh(vp_to_world_matrix, is_orthographic, far_dist, shape,
+                                                              context)
             if stencil_mesh_obj is not None:
                 stencil_mesh_objs.append(stencil_mesh_obj)
         return stencil_mesh_objs
@@ -60,15 +65,16 @@ def carvers_to_stencil_meshes(vp_proj_matrix, carvers, delete_carvers, union_ste
         raise e
 
 
-def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
+def _carver_to_stencil_shape(vp_view_matrix, is_orthographic, carver, delete_carver, context):
     """Projects the specified carver object through the 3D viewport to get a 2D stencil shape.
     Warning: This function may change the selection state of objects in the scene.
     Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
     could be derived, e.g. if the carver is an empty mesh.
     Raises ValueError if the carver has vertices that are currently behind the viewport camera, or if Blender is not
     currently in Object Mode.
-    vp_proj_matrix - The viewport camera's projection matrix (in other words, a transformation matrix from world space
+    vp_view_matrix - The viewport camera's view matrix (in other words, a transformation matrix from world space
         to the viewport camera's 3D space).
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
     carver - A Blender object indicating the carver geometry to use.
     delete_carver - Boolean indicating whether the carver object should be unlinked from the scene.
     context - The Blender context.
@@ -92,7 +98,8 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
 
     try:
         # Convert the mesh to a 2D stencil shape.
-        return _carver_mesh_to_stencil_shape(vp_proj_matrix @ carver_mesh_obj.matrix_world, carver_mesh_obj.data)
+        return _carver_mesh_to_stencil_shape(vp_view_matrix @ carver_mesh_obj.matrix_world, is_orthographic,
+                                             carver_mesh_obj.data)
 
     # Clean up the carver mesh object if appropriate.
     finally:
@@ -100,26 +107,28 @@ def _carver_to_stencil_shape(vp_proj_matrix, carver, delete_carver, context):
             bpy.data.objects.remove(carver_mesh_obj)
 
 
-def _carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+def _carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh):
     """Projects the specified carver mesh through the 3D viewport to get a 2D stencil shape.
     Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
     could be derived, e.g. if the carver mesh is empty.
     Raises ValueError if the carver has vertices that are currently behind the viewport camera.
-    to_vp_matrix - Transformation matrix from the mesh object's local 3D space to the viewport's 3D space.
+    to_cam_matrix - Transformation matrix from the mesh object's local 3D space to the camera's 3D space.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
     carver_mesh - A Blender mesh indicating the carver geometry to use.
     """
-    return _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh) if len(carver_mesh.polygons) <= 0 \
-        else _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh)
+    return _faceless_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh) \
+        if len(carver_mesh.polygons) <= 0 \
+        else _faced_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh)
 
 
-def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+def _faced_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh):
     """Same as _carver_mesh_to_stencil_shape, but only for meshes that have at least one face."""
     # Convert individual faces into stencil shapes.
 
     def face_to_stencil_shape(face):
         vert_coords_3d = [carver_mesh.vertices[carver_mesh.loops[loop_idx].vertex_index].co
                           for loop_idx in face.loop_indices]
-        vert_coords = [_vp_plane_project_pt(to_vp_matrix, vert) for vert in vert_coords_3d]
+        vert_coords = [_vp_plane_project_pt(to_cam_matrix, is_orthographic, vert) for vert in vert_coords_3d]
         return Polygon(vert_coords)
 
     face_stencil_shapes = [face_to_stencil_shape(face) for face in carver_mesh.polygons]
@@ -136,7 +145,7 @@ def _faced_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
     return stencil_shape if stencil_shape.is_valid else None
 
 
-def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
+def _faceless_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh):
     """Same as _carver_mesh_to_stencil_shape, but only for meshes with no faces."""
     # TODO
     return None
@@ -196,11 +205,13 @@ def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, carver_mesh):
 #         return True, pts
 
 
-def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
+def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, shape, context):
     """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
     Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None or
     cannot be converted to a stencil mesh.
-    from_vp_matrix - Transformation matrix from the viewport's 3D space to world space.
+    from_cam_matrix - Transformation matrix from the viewport camera's 3D space to world space.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
+    far_dist - Minimum distance from the camera that the 'far' part of the stencil mesh needs to have.
     shape - The shape to convert, as returned by _carver_to_stencil_shape.
     context - The Blender context.
     """
@@ -216,12 +227,18 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     num_vertices_2d = len(vertices_2d)
 
     # Build the 3D vertices.
-    vertices = [_vp_plane_project_pt_inv(from_vp_matrix, pt, True) for pt in vertices_2d] \
-        + [_vp_plane_project_pt_inv(from_vp_matrix, pt, False) for pt in vertices_2d]
+    vertices = [_vp_plane_project_pt_inv(from_cam_matrix, is_orthographic, far_dist, pt, False) for pt in vertices_2d]
+    if is_orthographic:
+        vertices += [_vp_plane_project_pt_inv(from_cam_matrix, is_orthographic, far_dist, pt, True)
+                     for pt in vertices_2d]
+    else:
+        vertices.append(_vp_plane_project_pt_inv(from_cam_matrix, is_orthographic, far_dist, (0, 0), True))
 
     # Build the faces for the near-camera and far-from-camera parts of the mesh.
-    faces = triangles_2d \
-        + [(tri[0] + num_vertices_2d, tri[1] + num_vertices_2d, tri[2] + num_vertices_2d) for tri in triangles_2d]
+    faces = triangles_2d.copy()
+    if is_orthographic:
+        faces += [(tri[0] + num_vertices_2d, tri[1] + num_vertices_2d, tri[2] + num_vertices_2d)
+                  for tri in triangles_2d]
 
     # Find the 2D edges, and count the number of (triangular) faces attached to each edge. Edges with only one face are
     # boundary edges of the shape and will require bridge faces in the 3D mesh.
@@ -237,8 +254,12 @@ def _stencil_shape_to_stencil_mesh(from_vp_matrix, shape, context):
     for edge_set, count in edge_counts.items():
         edge = tuple(edge_set)
         edges.append(edge)
-        if count == 1:
-            faces.append((edge[0], edge[1], edge[1] + num_vertices_2d, edge[0] + num_vertices_2d))
+        if is_orthographic:
+            edges.append((edge[0] + num_vertices_2d, edge[1] + num_vertices_2d))
+            if count == 1:
+                faces.append((edge[0], edge[1], edge[1] + num_vertices_2d, edge[0] + num_vertices_2d))
+        elif count == 1:
+            faces.append((edge[0], edge[1], num_vertices_2d))
 
     # Build a Blender mesh object from the computed geometry data, freeing the Python data as early as possible.
 
@@ -319,31 +340,43 @@ def _triangulate_stencil_shape(shape):
     return triangle.triangulate(shape_for_triangle_lib, 'p')
 
 
-def _vp_plane_project_pt(to_vp_matrix, pt):
+def _vp_plane_project_pt(to_cam_matrix, is_orthographic, pt):
     """Projects a single 3D point into the viewport camera's 2D plane.
     Returns the 2D point as a 2-tuple of numbers.
     Raises ValueError if the point is behind the camera.
-    to_vp_matrix - Transformation matrix from the input point's 3D space to the viewport's 3D space. This matrix is
-        typically constructed by multiplying the viewport camera's perspective matrix by the local-to-world matrix of
-        the object from which the input point was derived.
+    to_cam_matrix - Transformation matrix from the input point's 3D space to the 3D space relative to the camera.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
     pt - 3D input point to project, as a 3-tuple of numbers.
     """
-    projected_pt = to_vp_matrix @ mathutils.Vector((pt[0], pt[1], pt[2], 1))
-    if projected_pt[2] < 0:
-        raise ValueError('Carver object is behind the viewport camera')
-    return projected_pt[0], projected_pt[1]
+    projected_pt = to_cam_matrix @ mathutils.Vector((pt[0], pt[1], pt[2], 1))
+    if is_orthographic:
+        return projected_pt[0], projected_pt[1]
+    else:
+        if projected_pt[2] >= 0:
+            raise ValueError('Carver object is behind the viewport camera')
+        return projected_pt[0] / -projected_pt[2], projected_pt[1] / -projected_pt[2]
 
 
-def _vp_plane_project_pt_inv(from_vp_matrix, pt, close_to_cam):
+def _vp_plane_project_pt_inv(from_cam_matrix, is_orthographic, far_dist, pt, close_to_cam):
     """Projects a point in the viewport camera's 2D plane into 3D space, using a depth that is either 'close to' or 'far
     from' the viewport camera.
     Returns the 3D point as a 3-tuple of numbers.
-    from_vp_matrix - Transformation matrix from the viewport's 3D space to the output point's 3D space. If the desired
-        output space is world space, this matrix should be the inverse of the viewport camera's perspective matrix.
+    from_cam_matrix - Transformation matrix from the viewport camera's 3D space to the output point's 3D space. If the
+        desired output space is world space, this matrix should be the inverse of the viewport camera's view matrix.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
+    far_dist - Lower bound on the distance of the result from the camera if close_to_cam is false. The resulting point
+        will be in a plane perpendicular to the camera's facing direction, with the plane's distance from the camera
+        equal to this distance.
     pt - 2D input point in the viewport plane, as a 2-tuple of numbers.
     close_to_cam - Boolean indicating whether the output point should be close to the viewport camera (true) or far from
         the viewport camera (false).
     """
-    vp_coord_z = 0 if close_to_cam else 1
-    output_vec = from_vp_matrix @ mathutils.Vector((pt[0], pt[1], vp_coord_z, 1))
+    if is_orthographic:
+        view_space_output = mathutils.Vector((pt[0], pt[1], far_dist if close_to_cam else -far_dist, 1))
+    elif close_to_cam:
+        view_space_output = mathutils.Vector((0, 0, 0, 1))
+    else:
+        view_space_output = mathutils.Vector((pt[0] * far_dist, pt[1] * far_dist, -far_dist, 1))
+
+    output_vec = from_cam_matrix @ view_space_output
     return output_vec[0], output_vec[1], output_vec[2]
