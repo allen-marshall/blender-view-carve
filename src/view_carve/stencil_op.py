@@ -10,11 +10,6 @@ import mathutils
 from . import util_mesh
 from . import mesh_project
 
-
-# Threshold to use for finding overlapping geometry in boolean operations.
-# TODO: Make this configurable?
-_BOOLEAN_OP_THRESHOLD = 0.000001
-
 # Extra projection distance added to ensure that stencil meshes completely cut through the target object.
 _PROJECT_DIST_PADDING = 1
 
@@ -42,6 +37,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                                               default=False)
     prop_delete_carvers: bpy.props.BoolProperty(name='Delete Carver Objects',
                                                 description='Delete objects used for carving', default=False)
+    prop_overlap_threshold: bpy.props.FloatProperty(name='Overlap Threshold',
+                                                    description='Overlap threshold for Boolean operations', min=0.0,
+                                                    precision=6, unit='LENGTH', subtype='DISTANCE', default=0.000001)
 
     # Blender metadata.
     bl_idname = 'view_carve.stencil'
@@ -164,14 +162,15 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 target_data_copy = target.data.copy()
 
             # Apply boolean modifier to the original target object.
-            util_mesh.apply_boolean_op(context, target, stencil_mesh_obj, 'DIFFERENCE', _BOOLEAN_OP_THRESHOLD)
+            util_mesh.apply_boolean_op(context, target, stencil_mesh_obj, 'DIFFERENCE', self.prop_overlap_threshold)
 
             # If we are not in Subtract Only mode, create a new object and apply the opposite boolean modifier.
             if not self.prop_subtract_only:
                 new_target = bpy.data.objects.new(base_target_name, target_data_copy)
                 context.scene.collection.objects.link(new_target)
 
-                util_mesh.apply_boolean_op(context, new_target, stencil_mesh_obj, 'INTERSECT', _BOOLEAN_OP_THRESHOLD)
+                util_mesh.apply_boolean_op(context, new_target, stencil_mesh_obj, 'INTERSECT',
+                                           self.prop_overlap_threshold)
 
             return new_target
 
