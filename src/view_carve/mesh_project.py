@@ -9,7 +9,7 @@ import mathutils
 
 import ordered_set
 
-from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry import LineString, LinearRing, Polygon, MultiPolygon
 from shapely.geometry.collection import GeometryCollection
 import shapely.ops
 
@@ -147,62 +147,60 @@ def _faced_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_m
 
 def _faceless_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh):
     """Same as _carver_mesh_to_stencil_shape, but only for meshes with no faces."""
-    # TODO
-    return None
+    # Extract zero or more path shapes from the mesh by following edges. Paths may be open or closed.
 
-# def _faceless_carver_mesh_to_stencil_shape(to_vp_matrix, mesh):
-#     # Try to extract an open or closed path from the mesh by following edges starting from an arbitrary vertex.
-#     if len(list(mesh.verts)) <= 0:
-#         return None
-#     start_vert = mesh.verts[0]
-#     start_edges = start_vert.link_edges()
-#     start_edges.index_update()
-#     if len(start_edges) not in {1, 2}:
-#         return None
-#     (looped, pts_before) = _follow_edges(start_vert, start_edges[0])
-#     pts_after = [] if looped else (_follow_edges(start_vert, start_edges[1])[1] if len(start_edges) > 1 else [])
-#     if pts_before is None or pts_after is None:
-#         return None
-#
-#     # If the path does not include all vertices, the mesh is not path-shaped.
-#     if len(pts_before) + len(pts_after) + 1 != len(mesh.verts):
-#         return None
-#
-#     pts_before.reverse()
-#     pts = [_vp_plane_project_pt(to_vp_matrix, pt) for pt in pts_before + [start_vert.co] + pts_after]
-#
-#     # Try to convert the path to a 2D shape in the viewport, closing the path if it is open. This can fail, e.g. due to
-#     # a self-intersecting path.
-#     stencil_shape = Polygon(pts)
-#
-#     return stencil_shape if stencil_shape.is_valid else None
-#
-#
-# def _follow_edges(start_vert, start_edge):
-#     pts = []
-#     prev_vert = start_vert
-#     curr_vert = start_edge.other_vert(start_vert)
-#     curr_edges = curr_vert.link_edges
-#     curr_edges.index_update()
-#     while len(curr_edges) > 1 and curr_vert != start_vert:
-#         if len(curr_edges) != 2:
-#             return False, None
-#         else:
-#             pts.append(curr_vert.co)
-#
-#             other_vert0 = curr_edges[0].other_vert(curr_vert)
-#             other_vert1 = curr_edges[1].other_vert(curr_vert)
-#             next_vert = other_vert0 if other_vert0 != prev_vert else other_vert1
-#
-#             prev_vert = curr_vert
-#             curr_vert = next_vert
-#             curr_edges = curr_vert.link_edges
-#
-#     if curr_vert != start_vert:
-#         pts.append(curr_vert.co)
-#         return False, pts
-#     else:
-#         return True, pts
+    carver_bmesh = bmesh.new()
+    carver_bmesh.from_mesh(carver_mesh)
+
+    if len(list(carver_bmesh.verts)) <= 0:
+        return None
+
+    vert_paths = []
+    start_verts_to_ignore = set()
+    for start_vert in carver_bmesh.verts:
+        start_edges = start_vert.link_edges
+        start_edges.index_update()
+        if len(start_edges) in {1, 2} and start_vert not in start_verts_to_ignore:
+            vert_path = [start_vert]
+            path_finished = False
+            curr_vert = start_vert
+            curr_edge = start_edges[0]
+            while not path_finished:
+                next_vert = curr_edge.other_vert(curr_vert)
+                next_edges = next_vert.link_edges
+                next_edges.index_update()
+                vert_path.append(next_vert)
+                if next_vert == start_vert or len(next_edges) != 2:
+                    path_finished = True
+                else:
+                    curr_edge = next_edges[0] if next_edges[0].other_vert(next_vert) != curr_vert else next_edges[1]
+                    curr_vert = next_vert
+            vert_paths.append(vert_path)
+            start_verts_to_ignore.update(vert_path)
+
+    # Project paths into the viewport camera's 2D space.
+    paths = [[_vp_plane_project_pt(to_cam_matrix, is_orthographic, vert.co) for vert in vert_path]
+             for vert_path in vert_paths]
+
+    del vert_paths
+    del start_verts_to_ignore
+    carver_bmesh.free()
+
+    # Convert the 2D paths to Shapely polygons.
+    def path_to_shape(path):
+        linear_ring = LinearRing(path)
+        if linear_ring.is_valid:
+            return MultiPolygon(shapely.ops.polygonize([linear_ring]))
+        else:
+            line_string = LineString(path)
+            if line_string.is_simple and path[0] != path[-1]:
+                line_string = LineString(path + [path[0]])
+            # For self-intersecting paths, we want to create a polygon for each region enclosed by the path. The code
+            # here uses a bit of a hack to achieve this.
+            return MultiPolygon(shapely.ops.polygonize([shapely.ops.unary_union([line_string])]))
+    shape = shapely.ops.unary_union([path_to_shape(path) for path in paths])
+
+    return shape if shape.is_valid and not shape.is_empty else None
 
 
 def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, shape, context):
