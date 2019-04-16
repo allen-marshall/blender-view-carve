@@ -18,6 +18,9 @@ _BOOLEAN_OP_THRESHOLD = 0.000001
 # Extra projection distance added to ensure that stencil meshes completely cut through the target object.
 _PROJECT_DIST_PADDING = 1
 
+# Types of carver objects that are supported.
+_SUPPORTED_CARVER_TYPES = {'MESH', 'CURVE', 'SURFACE', 'FONT', 'GPENCIL'}
+
 
 class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     """Operator that carves off pieces of the active object based on other selected objects.
@@ -67,7 +70,11 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 or len(list(context.view_layer.objects.active.modifiers)) != 0:
             return False
 
-        # TODO: Make sure all selected objects can be converted to meshes?
+        # Make sure the carver objects (non-active selected objects) are of supported types.
+        for selected_obj in list(context.selected_objects):
+            if selected_obj is not context.view_layer.objects.active \
+                    and selected_obj.type not in _SUPPORTED_CARVER_TYPES:
+                return False
 
         return True
 
