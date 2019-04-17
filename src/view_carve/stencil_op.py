@@ -21,17 +21,20 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     """Operator that carves off pieces of the active object based on other selected objects.
     Carver objects are projected through the current 3D viewport to determine how to carve.
     Properties:
-    prop_subtract_only - If false, the pieces cut off from the target mesh will be left in the scene as new objects. If
-        true, the pieces will be deleted, leaving only the carved target mesh. Default: False
+    prop_pieces_to_keep - Determines whether to keep only the pieces obtained by Boolean subtraction, only the pieces
+        obtained by Boolean intersection, or both. Default: Keep all pieces.
     prop_union_carves - If true, the operator will apply all found carvers as a single cut. This option only matters
         when prop_subtract_only is false. In that case, setting prop_union_carves to true results in a maximum of one
         new object, while setting it to false can result in more than one new object. Default: False
     prop_delete_carvers - If true, the objects used for carving will be deleted. Default: False
+    prop_overlap_threshold - Overlap threshold to use in Boolean operations invoked by this operator.
     """
     # Blender operator properties.
-    prop_subtract_only: bpy.props.BoolProperty(name='Subtract Only',
-                                               description='Subtract geometry instead of splitting into multiple objects',
-                                               default=False)
+    prop_pieces_to_keep: bpy.props.EnumProperty(
+        items=[('DIFFERENCE', 'Difference', 'Keep only the piece obtained by subtracting the stencil(s).'),
+         ('INTERSECTION', 'Intersection', 'Keep only the piece obtained by intersecting with the stencil(s).'),
+         ('ALL', 'All', 'Keep all pieces.')], name='Pieces to Keep',
+        description='Determines which pieces from the cut are kept', default='ALL')
     prop_union_carves: bpy.props.BoolProperty(name='Union Carves',
                                               description='Make a single combined carve from all carver objects',
                                               default=False)
@@ -154,31 +157,36 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
         stencil_mesh_obj - The mesh object to use for boolean operations on the target.
         base_target_name - The base name to use for the new mesh object.
         """
-        target_data_copy = None
-        new_target = None
-        try:
-            # If we are not in Subtract Only mode, we will need a copy of the target mesh data to create the new object.
-            if not self.prop_subtract_only:
+        # If we are keeping all pieces, we need to copy the target mesh and perform both intersection and difference.
+        if self.prop_pieces_to_keep == 'ALL':
+            target_data_copy = None
+            new_target = None
+            try:
+                # Copy the target.
                 target_data_copy = target.data.copy()
-
-            # Apply boolean modifier to the original target object.
-            util_mesh.apply_boolean_op(context, target, stencil_mesh_obj, 'DIFFERENCE', self.prop_overlap_threshold)
-
-            # If we are not in Subtract Only mode, create a new object and apply the opposite boolean modifier.
-            if not self.prop_subtract_only:
                 new_target = bpy.data.objects.new(base_target_name, target_data_copy)
                 context.scene.collection.objects.link(new_target)
 
+                # Perform difference on the old copy and intersection on the new copy.
+                util_mesh.apply_boolean_op(context, target, stencil_mesh_obj, 'DIFFERENCE', self.prop_overlap_threshold)
                 util_mesh.apply_boolean_op(context, new_target, stencil_mesh_obj, 'INTERSECT',
                                            self.prop_overlap_threshold)
 
-            return new_target
+                return new_target
 
-        except Exception as e:
-            # Try to clean up.
-            if new_target is not None:
-                bpy.data.objects.remove(new_target)
-            if target_data_copy is not None:
-                bpy.data.meshes.remove(target_data_copy)
+            except Exception as e:
+                # Try to clean up.
+                if new_target is not None:
+                    bpy.data.objects.remove(new_target)
+                if target_data_copy is not None:
+                    bpy.data.meshes.remove(target_data_copy)
 
-            raise e
+                raise e
+
+        # If we are keeping only one piece, we can just convert the existing target into that piece instead of making a
+        # copy.
+        else:
+            util_mesh.apply_boolean_op(context, target, stencil_mesh_obj,
+                                       'DIFFERENCE' if self.prop_pieces_to_keep == 'DIFFERENCE' else 'INTERSECT',
+                                       self.prop_overlap_threshold)
+            return None
