@@ -5,6 +5,9 @@ View Carve Blender Addon Documentation
    :maxdepth: 2
    :caption: Contents:
 
+   installation
+   usage
+
 View Carve is a Blender_ addon that allows users to cut meshes into pieces, using other
 3D objects as "stencils" to control the cut. The stencil objects (aka "carvers") are projected through the 3D viewport
 to make the cut, so you can typically see what the cut will look like before making it.
@@ -16,20 +19,19 @@ TODO: Insert example with screenshot.
 Installation
 ------------
 
-TODO: Link to installation instructions.
+See :doc:`installation instructions <installation>`.
 
 Usage
 -----
 
-TODO: Link to usage instructions.
+See :doc:`usage instructions <usage>`.
 
 Having Issues?
 --------------
 
 If you are experiencing a bug, feel free to open an issue
-here_. You can also email the project maintainer at allen.marshall.22@gmail.com.
-
-.. _here: https://github.com/allen-marshall/blender-view-carve/issues
+`here <https://github.com/allen-marshall/blender-view-carve/issues>`_. You can also email the project maintainer at
+allen.marshall.22@gmail.com.
 
 License
 -------
@@ -45,5 +47,4 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
