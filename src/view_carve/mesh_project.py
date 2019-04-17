@@ -251,6 +251,7 @@ def _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths):
 
 def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, shape, context):
     """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
+    Warning: This function may change the selection state of objects in the scene.
     Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None or
     cannot be converted to a stencil mesh.
     from_cam_matrix - Transformation matrix from the viewport camera's 3D space to world space.
@@ -311,13 +312,22 @@ def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, s
     mesh_obj = None
     try:
         mesh.from_pydata(vertices, edges, faces)
-        mesh.calc_normals_split()
         mesh.update()
         if not mesh.validate():
             raise ValueError('Somehow created invalid mesh; cannot continue')
 
         mesh_obj = bpy.data.objects.new('viewCarveTemp_stencilMeshObj', mesh)
         context.scene.collection.objects.link(mesh_obj)
+
+        # Set consistent normals for the mesh.
+        bpy.ops.object.select_all(action='DESELECT')
+        mesh_obj.select_set(True)
+        context.view_layer.objects.active = mesh_obj
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.normals_make_consistent()
+        bpy.ops.object.mode_set(mode='OBJECT')
+
         return mesh_obj
 
     except Exception as e:
