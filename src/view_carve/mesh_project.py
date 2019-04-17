@@ -82,29 +82,38 @@ def _carver_to_stencil_shape(vp_view_matrix, is_orthographic, carver, delete_car
     if context.mode != 'OBJECT':
         raise ValueError('Not in Object Mode')
 
-    # If the carver is not a mesh object, convert it to a mesh object, deleting the original object if delete_carver is
-    # true.
-    carver_was_mesh = carver.type == 'MESH'
-    if not carver_was_mesh:
-        bpy.ops.object.select_all(action='DESELECT')
-        carver.select_set(True)
-        context.view_layer.objects.active = carver
-        convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
-        if convert_result != {'FINISHED'}:
-            raise ValueError('Failed to convert carver to mesh')
-        carver_mesh_obj = context.view_layer.objects.active
+    # Special case for grease pencil carvers.
+    if carver.type == 'GPENCIL':
+        try:
+            return _carver_gpencil_obj_to_stencil_shape(vp_view_matrix @ carver.matrix_world, is_orthographic, carver)
+        finally:
+            if delete_carver:
+                bpy.data.objects.remove(carver)
+
+    # Handle other types of carvers.
     else:
-        carver_mesh_obj = carver
+        # If the carver is not a mesh object, convert it to a mesh object, deleting the original object if delete_carver
+        # is true.
+        carver_was_mesh = carver.type == 'MESH'
+        if not carver_was_mesh:
+            bpy.ops.object.select_all(action='DESELECT')
+            carver.select_set(True)
+            context.view_layer.objects.active = carver
+            convert_result = bpy.ops.object.convert(target='MESH', keep_original=not delete_carver)
+            if convert_result != {'FINISHED'}:
+                raise ValueError('Failed to convert carver to mesh')
+            carver_mesh_obj = context.view_layer.objects.active
+        else:
+            carver_mesh_obj = carver
 
-    try:
-        # Convert the mesh to a 2D stencil shape.
-        return _carver_mesh_to_stencil_shape(vp_view_matrix @ carver_mesh_obj.matrix_world, is_orthographic,
-                                             carver_mesh_obj.data)
+        try:
+            # Convert the mesh to a 2D stencil shape.
+            return _carver_mesh_to_stencil_shape(vp_view_matrix @ carver_mesh_obj.matrix_world, is_orthographic,
+                                                 carver_mesh_obj.data)
 
-    # Clean up the carver mesh object if appropriate.
-    finally:
-        if delete_carver or not carver_was_mesh:
-            bpy.data.objects.remove(carver_mesh_obj)
+        finally:
+            if delete_carver or not carver_was_mesh:
+                bpy.data.objects.remove(carver_mesh_obj)
 
 
 def _carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carver_mesh):
@@ -178,13 +187,50 @@ def _faceless_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carve
             vert_paths.append(vert_path)
             start_verts_to_ignore.update(vert_path)
 
-    # Project paths into the viewport camera's 2D space.
-    paths = [[_vp_plane_project_pt(to_cam_matrix, is_orthographic, vert.co) for vert in vert_path]
-             for vert_path in vert_paths]
+    # Generate the 2D shape.
+
+    paths = [[vert.co for vert in vert_path] for vert_path in vert_paths]
 
     del vert_paths
     del start_verts_to_ignore
     carver_bmesh.free()
+
+    return _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths)
+
+
+def _carver_gpencil_obj_to_stencil_shape(to_cam_matrix, is_orthographic, carver_gpencil):
+    """Projects the specified carver grease pencil object through the 3D viewport to get a 2D stencil shape.
+    Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
+    could be derived.
+    Raises ValueError if the carver object's strokes have vertices that are behind the viewport camera.
+    to_cam_matrix - Transformation matrix from the grease pencil object's local 3D space to the camera's 3D space.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
+    carver_gpencil - A Blender grease pencil object indicating the carver geometry to use.
+    """
+    # Extract a path from each stroke in the grease pencil object.
+    paths = []
+    for layer in carver_gpencil.data.layers:
+        for stroke in layer.active_frame.strokes:
+            path = [pt.co for pt in stroke.points]
+            if stroke.draw_cyclic and len(path) > 1 and path[0] != path[-1]:
+                path.append(path[0])
+            paths.append(path)
+
+    # Generate the 2D shape.
+    return _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths)
+
+
+def _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths):
+    """Projects the specified 3D paths through the viewport to get a stencil shape.
+    Returns the 2D stencil shape as a Shapely shape consisting of one or more polygons. Returns None if no polygons
+    could be derived.
+    Raises ValueError if the paths have vertices that are behind the viewport camera.
+    to_cam_matrix - Transformation matrix from the paths' local 3D space to the camera's 3D space.
+    is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
+    paths - list of lists of 3-tuples indicating the path points in 3D space.
+    """
+    # Project paths into the viewport camera's 2D space.
+    paths_2d = [[_vp_plane_project_pt(to_cam_matrix, is_orthographic, pt) for pt in path] for path in paths]
 
     # Convert the 2D paths to Shapely polygons.
     def path_to_shape(path):
@@ -198,7 +244,7 @@ def _faceless_carver_mesh_to_stencil_shape(to_cam_matrix, is_orthographic, carve
             # For self-intersecting paths, we want to create a polygon for each region enclosed by the path. The code
             # here uses a bit of a hack to achieve this.
             return MultiPolygon(shapely.ops.polygonize([shapely.ops.unary_union([line_string])]))
-    shape = shapely.ops.unary_union([path_to_shape(path) for path in paths])
+    shape = shapely.ops.unary_union([path_to_shape(path) for path in paths_2d])
 
     return shape if shape.is_valid and not shape.is_empty else None
 
