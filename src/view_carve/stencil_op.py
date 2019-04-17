@@ -31,10 +31,10 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     """
     # Blender operator properties.
     prop_pieces_to_keep: bpy.props.EnumProperty(
-        items=[('DIFFERENCE', 'Difference', 'Keep only the piece obtained by subtracting the stencil(s).'),
-         ('INTERSECTION', 'Intersection', 'Keep only the piece obtained by intersecting with the stencil(s).'),
-         ('ALL', 'All', 'Keep all pieces.')], name='Pieces to Keep',
-        description='Determines which pieces from the cut are kept', default='ALL')
+        items=[('ALL', 'All', 'Keep all pieces.'),
+               ('DIFFERENCE', 'Difference', 'Keep only the piece obtained by subtracting the stencil(s).'),
+               ('INTERSECTION', 'Intersection', 'Keep only the piece obtained by intersecting with the stencil(s).')],
+        name='Pieces to Keep', description='Determines which pieces from the cut are kept', default='ALL')
     prop_union_carves: bpy.props.BoolProperty(name='Union Carves',
                                               description='Make a single combined carve from all carver objects',
                                               default=False)
