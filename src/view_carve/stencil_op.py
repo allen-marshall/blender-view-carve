@@ -92,7 +92,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             cam_pt = (view_matrix_inv @ mathutils.Vector((0, 0, 0, 1))).to_3d()
 
             # Determine projection distance required to make the stencil meshes cut through the active object.
-            bb_pts = [mathutils.Vector(bb_pt) for bb_pt in orig_target.bound_box]
+            target_to_world = orig_target.matrix_world
+            bb_pts = [(target_to_world @ mathutils.Vector((bb_pt[0], bb_pt[1], bb_pt[2], 1))).to_3d()
+                      for bb_pt in orig_target.bound_box]
             project_dist = math.sqrt(max([(bb_pt - cam_pt).length_squared for bb_pt in bb_pts])) + _PROJECT_DIST_PADDING
 
             # Create stencil mesh objects from the carver objects. (Only one stencil mesh will be created if we are in
