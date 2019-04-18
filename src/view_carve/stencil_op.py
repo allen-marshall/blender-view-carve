@@ -73,9 +73,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
 
         # Make sure the carver objects (non-active selected objects) are of supported types.
         for selected_obj in list(context.selected_objects):
-            if selected_obj is not context.view_layer.objects.active \
-                    and selected_obj.type not in _SUPPORTED_CARVER_TYPES:
-                return False
+            if selected_obj is not context.view_layer.objects.active:
+                if selected_obj.type not in _SUPPORTED_CARVER_TYPES or len(list(selected_obj.modifiers)) != 0:
+                    return False
 
         return True
 
