@@ -3,6 +3,7 @@
 import bpy
 
 from . import stencil_op
+from . import menus
 
 bl_info = {
     'name': 'Projection Carving Tool',
@@ -14,7 +15,13 @@ bl_info = {
     'tracker_url': 'https://github.com/allen-marshall/blender-view-carve/issues',
 }
 
-register, unregister = bpy.utils.register_classes_factory((stencil_op.VIEW_CARVE_OT_stencil,))
+basic_register, unregister = bpy.utils.register_classes_factory((stencil_op.VIEW_CARVE_OT_stencil,))
+
+
+def register():
+    basic_register()
+    bpy.types.VIEW3D_MT_object.append(menus.vp_object_menu_extension)
+
 
 if __name__ == '__main__':
     register()
