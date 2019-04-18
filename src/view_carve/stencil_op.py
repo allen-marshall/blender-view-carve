@@ -53,6 +53,8 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         # Make sure we are in Object Mode with at least two selected objects.
+        # TODO: It should be len(list(context.selected_objects)) < 2 instead of len(list(context.selected_objects)) < 1,
+        # but currently that doesn't work well due to what appears to be a bug in Blender.
         if context is None \
                 or not hasattr(context, 'region_data') or context.region_data is None \
                 or not hasattr(context, 'scene') or context.scene is None \
@@ -62,7 +64,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 or not hasattr(context.view_layer, 'objects') or context.view_layer.objects is None \
                 or not hasattr(context.view_layer.objects, 'active') or context.view_layer.objects.active is None \
                 or not hasattr(context, 'selected_objects') or context.selected_objects is None \
-                or len(list(context.selected_objects)) < 2 \
+                or len(list(context.selected_objects)) < 1 \
                 or not hasattr(context, 'mode') or context.mode != 'OBJECT':
             return False
 
