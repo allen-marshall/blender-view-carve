@@ -16,8 +16,8 @@ import shapely.ops
 import triangle
 
 
-def carvers_to_stencil_meshes(vp_view_matrix, is_orthographic, far_dist, carvers, delete_carvers, union_stencils,
-                              context):
+def carvers_to_stencil_meshes(vp_view_matrix, is_orthographic, far_dist, buffer_ratio, carvers, delete_carvers,
+                              union_stencils, context):
     """Projects the specified carver objects through the 3D viewport to get stencil meshes.
     Warning: This function may change the selection state of objects in the scene.
     Returns a list of newly created stencil mesh objects that have been linked to the scene. If union_stencils is true,
@@ -28,6 +28,8 @@ def carvers_to_stencil_meshes(vp_view_matrix, is_orthographic, far_dist, carvers
         to the viewport camera's 3D space).
     is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
     far_dist - Minimum distance from the camera that the 'far' part of the stencil mesh needs to have.
+    buffer_ratio - Amount by which to grow the 2D stencil shape to avoid bad geometry, as a fraction of the shape's
+        width or height (whichever is larger).
     carvers - List of Blender objects indicating the carver objects to use.
     delete_carvers - Boolean indicating whether the carver objects should be unlinked from the scene.
     union_stencils - Boolean indicating whether to create a single unioned stencil (true), or a separate stencil for
@@ -51,8 +53,8 @@ def carvers_to_stencil_meshes(vp_view_matrix, is_orthographic, far_dist, carvers
     stencil_mesh_objs = []
     try:
         for shape in stencil_shapes:
-            stencil_mesh_obj = _stencil_shape_to_stencil_mesh(vp_to_world_matrix, is_orthographic, far_dist, shape,
-                                                              context)
+            stencil_mesh_obj = _stencil_shape_to_stencil_mesh(vp_to_world_matrix, is_orthographic, far_dist,
+                                                              buffer_ratio, shape, context)
             if stencil_mesh_obj is not None:
                 stencil_mesh_objs.append(stencil_mesh_obj)
         return stencil_mesh_objs
@@ -249,7 +251,7 @@ def _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths):
     return shape if shape.is_valid and not shape.is_empty else None
 
 
-def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, shape, context):
+def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, buffer_ratio, shape, context):
     """Creates a stencil mesh object by projecting the specified 2D shape into 3D space through the viewport camera.
     Warning: This function may change the selection state of objects in the scene.
     Returns a newly created stencil mesh object that has been linked to the scene. Returns None if shape is None or
@@ -257,14 +259,22 @@ def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, s
     from_cam_matrix - Transformation matrix from the viewport camera's 3D space to world space.
     is_orthographic - Boolean indicating whether the viewport camera is orthographic (true) or perspective (false).
     far_dist - Minimum distance from the camera that the 'far' part of the stencil mesh needs to have.
+    buffer_ratio - Amount by which to grow the stencil shape to avoid bad geometry, as a fraction of the shape's width
+        or height (whichever is larger).
     shape - The shape to convert, as returned by _carver_to_stencil_shape.
     context - The Blender context.
     """
     if shape is None:
         return None
 
-    # Triangulate the stencil shape so we don't have to worry about holes in polygons.
-    triangulated_shape = _triangulate_stencil_shape(shape)
+    # Grow the stencil shape slightly. This helps generate better geometry in some cases, by filling in holes that may
+    # have been created by floating point error.
+    min_x, min_y, max_x, max_y = shape.bounds
+    approx_shape_size = max(max_x - min_x, max_y - min_y)
+    buffered_shape = shape.buffer(approx_shape_size * buffer_ratio)
+
+    # Triangulate the stencil shape so we won't have to make Blender mesh faces with holes in them.
+    triangulated_shape = _triangulate_stencil_shape(buffered_shape)
     if triangulated_shape is None:
         return None
     vertices_2d = triangulated_shape['vertices'].tolist()

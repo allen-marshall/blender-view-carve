@@ -43,6 +43,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
     prop_overlap_threshold: bpy.props.FloatProperty(name='Overlap Threshold',
                                                     description='Overlap threshold for Boolean operations', min=0.0,
                                                     precision=6, unit='LENGTH', subtype='DISTANCE', default=0.000001)
+    prop_buffer_ratio: bpy.props.FloatProperty(name='Stencil Grow Ratio',
+                                               description='Controls how much the stencil shape is grown to avoid bad geometry',
+                                               min=0.0, precision=6, default=0.0001)
 
     # Blender metadata.
     bl_idname = 'view_carve.stencil'
@@ -103,9 +106,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             # Union Carves mode.)
             stencil_mesh_objs = mesh_project.carvers_to_stencil_meshes(context.region_data.view_matrix,
                                                                        not context.region_data.is_perspective,
-                                                                       project_dist, carver_objs,
-                                                                       self.prop_delete_carvers, self.prop_union_carves,
-                                                                       context)
+                                                                       project_dist, self.prop_buffer_ratio,
+                                                                       carver_objs, self.prop_delete_carvers,
+                                                                       self.prop_union_carves, context)
 
             # Apply each stencil mesh.
             targets = [orig_target]
