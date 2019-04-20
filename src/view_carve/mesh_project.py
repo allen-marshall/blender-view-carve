@@ -294,17 +294,24 @@ def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, s
         edge_2 = frozenset((tri[2], tri[0]))
         edge_counts.update((edge_0, edge_1, edge_2))
 
-    # Build the 3D edges and the faces that bridge the near-camera and far-from-camera parts of the mesh.
-    edges = []
+    # Build the 3D faces that bridge the near-camera and far-from-camera parts of the mesh.
     for edge_set, count in edge_counts.items():
         edge = tuple(edge_set)
-        edges.append(edge)
-        if is_orthographic:
-            edges.append((edge[0] + num_vertices_2d, edge[1] + num_vertices_2d))
-            if count == 1:
+        if count == 1:
+            if is_orthographic:
                 faces.append((edge[0], edge[1], edge[1] + num_vertices_2d, edge[0] + num_vertices_2d))
-        elif count == 1:
-            faces.append((edge[0], edge[1], num_vertices_2d))
+            else:
+                faces.append((edge[0], edge[1], num_vertices_2d))
+
+    # Build the edges.
+    def edges_from_face(face_verts):
+        output = []
+        for idx in range(len(face_verts)):
+            output.append((face_verts[idx], face_verts[(idx + 1) % len(face_verts)]))
+        return output
+    edges = []
+    for face in faces:
+        edges.extend(edges_from_face(face))
 
     # Build a Blender mesh object from the computed geometry data, freeing the Python data as early as possible.
 
@@ -312,6 +319,9 @@ def _stencil_shape_to_stencil_mesh(from_cam_matrix, is_orthographic, far_dist, s
     mesh_obj = None
     try:
         mesh.from_pydata(vertices, edges, faces)
+        del vertices
+        del edges
+        del faces
         mesh.update()
         if not mesh.validate():
             raise ValueError('Somehow created invalid mesh; cannot continue')
