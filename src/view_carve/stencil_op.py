@@ -44,7 +44,7 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                                                     description='Overlap threshold for Boolean operations', min=0.0,
                                                     precision=6, unit='LENGTH', subtype='DISTANCE', default=0.000001)
     prop_buffer_ratio: bpy.props.FloatProperty(name='Stencil Grow Ratio',
-                                               description='Controls how much the stencil shape is grown to avoid bad geometry',
+                                               description='Controls how much the stencil shape is grown to prevent bad geometry',
                                                min=0.0, precision=6, default=0.0002)
 
     # Blender metadata.
