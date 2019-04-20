@@ -108,12 +108,11 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                                                                        context)
 
             # Apply each stencil mesh.
-            target_name = orig_target.name
             targets = [orig_target]
             for stencil_mesh_obj in stencil_mesh_objs:
                 new_targets = []
                 for target in targets:
-                    new_target = self._separate_obj(context, target, stencil_mesh_obj, target_name)
+                    new_target = self._separate_obj(context, target, stencil_mesh_obj)
                     if new_target is not None:
                         new_targets.append(new_target)
                         new_objs.append(new_target)
@@ -152,24 +151,24 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
             for stencil_mesh_obj in stencil_mesh_objs:
                 bpy.data.objects.remove(stencil_mesh_obj)
 
-    def _separate_obj(self, context, target, stencil_mesh_obj, base_target_name):
+    def _separate_obj(self, context, target, stencil_mesh_obj):
         """Separates a mesh object using the specified stencil mesh.
         Modifies the original target mesh using the stencil.
         Returns the new mesh object obtained by cutting off a piece of the target, or None if no object was generated.
         context - The Blender context.
         target - The mesh object to carve.
         stencil_mesh_obj - The mesh object to use for boolean operations on the target.
-        base_target_name - The base name to use for the new mesh object.
         """
         # If we are keeping all pieces, we need to copy the target mesh and perform both intersection and difference.
         if self.prop_pieces_to_keep == 'ALL':
-            target_data_copy = None
             new_target = None
             try:
                 # Copy the target.
-                target_data_copy = target.data.copy()
-                new_target = bpy.data.objects.new(base_target_name, target_data_copy)
-                context.scene.collection.objects.link(new_target)
+                bpy.ops.object.select_all(action='DESELECT')
+                target.select_set(True)
+                context.view_layer.objects.active = target
+                bpy.ops.object.duplicate(linked=False)
+                new_target = context.view_layer.objects.active
 
                 # Perform difference on the old copy and intersection on the new copy.
                 util_mesh.apply_boolean_op(context, target, stencil_mesh_obj, 'DIFFERENCE', self.prop_overlap_threshold)
@@ -182,8 +181,6 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 # Try to clean up.
                 if new_target is not None:
                     bpy.data.objects.remove(new_target)
-                if target_data_copy is not None:
-                    bpy.data.meshes.remove(target_data_copy)
 
                 raise e
 
