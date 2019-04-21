@@ -14,7 +14,9 @@ what the cut will look like before making it.
 
 .. _Blender: https://www.blender.org/
 
-TODO: Insert example with screenshot.
+Example before-and-after screenshot:
+
+.. image:: _static/screenshots/basic_example.png
 
 Installation
 ------------

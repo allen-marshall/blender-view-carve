@@ -16,9 +16,10 @@ following types of objects can be used as stencils:
 - Surfaces
 - Text objects
 
-The following screenshots show the result of using some Grease Pencil strokes and meshes as stencils to cut a cube:
+The following before-and-after screenshots show the result of using some Grease Pencil strokes and meshes as stencils to
+cut a cube:
 
-TODO: Insert screenshot example here.
+.. image:: _static/screenshots/basic_example.png
 
 Operator Options
 ----------------
@@ -57,9 +58,13 @@ When using Grease Pencil or Curve objects as stencils, there are a few things to
 - If the curve is closed or intersects itself (or appears to do so in the viewport's projection), the region enclosed by
   the curve is used as the stencil, as in the following screenshots.
 
-TODO: Insert screenshot examples here.
+.. image:: _static/screenshots/curve_example_1.png
+
+.. image:: _static/screenshots/curve_example_2.png
 
 - If the curve is not closed and does not intersect itself, the curve will be auto-closed, i.e. treated as if its first
   and last points were joined by a straight line, as in the following screenshots.
 
-TODO: Insert screenshot examples here.
+.. image:: _static/screenshots/auto_close_example_1.png
+
+.. image:: _static/screenshots/auto_close_example_2.png
