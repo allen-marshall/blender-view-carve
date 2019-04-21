@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -147,10 +148,13 @@ if __name__ == '__main__':
 
         # Copy the View Carve code into the user's Blender configuration directory.
         print('Copying View Carve to user\'s Blender config folder...')
-        view_carve_src_path = os.path.join(os.getcwd(), 'src', 'view_carve')
+        view_carve_src_path = sys.path[0]
+        if len(view_carve_src_path) == 0:
+            view_carve_src_path = os.getcwd()
+        view_carve_addon_src_path = os.path.join(view_carve_src_path, 'src', 'view_carve')
         blender_config_view_carve_path = os.path.join(blender_config_addons_path, 'view_carve')
         if os.access(blender_config_view_carve_path, os.F_OK):
             shutil.rmtree(blender_config_view_carve_path)
-        shutil.copytree(view_carve_src_path, blender_config_view_carve_path)
+        shutil.copytree(view_carve_addon_src_path, blender_config_view_carve_path)
 
         print('Done.')
