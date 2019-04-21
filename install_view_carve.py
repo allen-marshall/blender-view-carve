@@ -125,12 +125,21 @@ if __name__ == '__main__':
         # Next, we need to copy the dependencies and the View Carve code into the user's Blender configuration
         # directory.
 
+        # Find the (platform-dependent) Blender configuration directory for the user.
+        if sys.platform.startswith('win32') or sys.platform.startswith('cygwin'):
+            blender_config_path = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'Blender Foundation',
+                                               'Blender', blender_version_string)
+        elif sys.platform.startswith('darwin'):
+            blender_config_path = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'Blender',
+                                               blender_version_string)
+        else:
+            blender_config_path = os.path.join(os.path.expanduser('~'), '.config', 'blender', blender_version_string)
+
         # Copy the dependencies into the user's Blender configuration directory.
         print('Copying dependencies to user\'s Blender config folder...')
-        blender_config_scripts_path = os.path.join(os.path.expanduser('~'), '.config', 'blender',
-                                                   blender_version_string, 'scripts')
-        blender_config_modules_path = os.path.join(blender_config_scripts_path, 'modules')
-        blender_config_addons_path = os.path.join(blender_config_scripts_path, 'addons')
+
+        blender_config_modules_path = os.path.join(blender_config_path, 'scripts', 'addons', 'modules')
+        blender_config_addons_path = os.path.join(blender_config_path, 'scripts', 'addons')
         os.makedirs(blender_config_modules_path, exist_ok=True)
         os.makedirs(blender_config_addons_path, exist_ok=True)
         blender_config_ordered_set_path = os.path.join(blender_config_modules_path, 'ordered_set.py')
