@@ -44,9 +44,3 @@ Source Repository
 -----------------
 
 https://github.com/allen-marshall/blender-view-carve
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
