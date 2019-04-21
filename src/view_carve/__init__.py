@@ -6,7 +6,7 @@ from . import stencil_op
 from . import menus
 
 bl_info = {
-    'name': 'Projection Carving Tool',
+    'name': 'View Carve',
     'description': 'Tool for carving a mesh object based on projections of other objects in the 3D viewport',
     'author': 'Allen Marshall',
     'version': (0, 4),
