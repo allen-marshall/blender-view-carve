@@ -74,14 +74,3 @@ stencil meshes) or grease pencil objects will essentially be ignored. The cut ap
 geometry, not to its geometry after modifiers. This can lead to surprising behavior if a target or stencil object has
 unapplied modifiers. Note, however, that unapplied modifiers on stencil objects other than meshes and grease pencil
 objects (e.g. curves, surfaces, text) are *not* ignored.
-
-When using strokes or curves as stencils, be aware that the cut may sometimes generate bad geometry, or fail to occur at
-all, if one of the following is true:
-
-- A curve intersects itself at more than one point in the viewport (including after auto-closing).
-- A curve is both closed *and* self-intersecting in the viewport.
-
-The issues with these conditions occur fairly inconsistently. This behavior is a bug, but likely will not be fixed in
-the near future, because it is difficult to fix and relatively easy to avoid in most use cases. To avoid the issue, try
-to avoid using stencil objects that meet either of the above criteria. Curves that self-intersect at *one* point should
-be fine, as well as closed (or auto-closed) curves that do not self-intersect.
