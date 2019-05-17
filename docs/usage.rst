@@ -7,8 +7,7 @@ Basic Information
 Once installed, the View Carve addon adds a new operator called "Viewport Stencil Carve" to Blender. The operator can be
 accessed from the Object menu in the 3D viewport. To use the operator, you must select all the objects you want to use
 as stencils, along with the target mesh object to be cut. The target mesh should be the last object selected, i.e. the
-active object. The operator cannot be used if the target mesh or stencil object(s) have unapplied modifiers. The
-following types of objects can be used as stencils:
+active object. The following types of objects can be used as stencils:
 
 - Grease Pencil objects
 - Curves
