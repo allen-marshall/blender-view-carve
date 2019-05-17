@@ -32,8 +32,8 @@ The following properties can be set in the operator properties panel after apply
   stencils will be kept. (In the case of Intersection, if the stencils don't all overlap, there will be no piece to
   keep, and the target mesh will simply be deleted.)
 - Union Carves. When enabled, this property causes all the stencils to be treated as if they were a single stencil
-  object, obtained by taking the Boolean union of the stencils. This property is only relevant if Pieces to Keep is All
-  and there are multiple stencil objects. When this property is enabled, the cut will result in at most two pieces.
+  object, obtained by taking the Boolean union of the stencils. This property is only relevant if there are multiple
+  stencil objects. When this property is enabled, the cut will result in at most two pieces.
 - Delete Carver Objects. When enabled, this property causes the stencil objects to be deleted after they have been used
   to cut the target mesh. This can be convenient if you created the stencil objects for the sole purpose of acting as
   stencils.
