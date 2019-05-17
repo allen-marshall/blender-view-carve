@@ -125,8 +125,9 @@ class VIEW_CARVE_OT_stencil(bpy.types.Operator):
                 if len(list(target.data.vertices)) == 0:
                     if target is orig_target:
                         orig_target = None
+                    else:
+                        new_objs.remove(target)
                     bpy.data.objects.remove(target)
-                    new_objs.remove(target)
 
             # Set the final selection to something that makes sense for the operation.
             bpy.ops.object.select_all(action='DESELECT')
