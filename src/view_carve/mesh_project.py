@@ -236,6 +236,8 @@ def _paths_to_stencil_shape(to_cam_matrix, is_orthographic, paths):
 
     # Convert the 2D paths to Shapely polygons.
     def path_to_shape(path):
+        if len(path) < 3:
+            return MultiPolygon([])
         linear_ring = LinearRing(path)
         if linear_ring.is_valid:
             return MultiPolygon(shapely.ops.polygonize([linear_ring]))
