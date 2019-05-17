@@ -66,4 +66,20 @@ When using Grease Pencil or Curve objects as stencils, there are a few things to
 
 .. image:: _static/screenshots/auto_close_example_1.png
 
-.. image:: _static/screenshots/auto_close_example_2.png
+Caveats
+-------
+
+When using the Viewport Stencil Carve operator, any unapplied modifiers on mesh objects (including the target mesh or
+stencil meshes) will essentially be ignored. The cut applies to the target mesh's base geometry, not to its geometry
+after modifiers. This can lead to surprising behavior if a target or stencil mesh object has unapplied modifiers.
+
+When using strokes or curves as stencils, be aware that the cut may sometimes generate bad geometry, or fail to occur at
+all, if one of the following is true:
+
+- A curve intersects itself at more than one point in the viewport (including after auto-closing).
+- A curve is both closed *and* self-intersecting in the viewport.
+
+The issues with these conditions occur fairly inconsistently. This behavior is a bug, but likely will not be fixed in
+the near future, because it is difficult to fix and relatively easy to avoid in most use cases. To avoid the issue, try
+to avoid using stencil objects that meet either of the above criteria. Curves that self-intersect at *one* point should
+be fine, as well as closed (or auto-closed) curves that do not self-intersect.
