@@ -70,8 +70,10 @@ Caveats
 -------
 
 When using the Viewport Stencil Carve operator, any unapplied modifiers on mesh objects (including the target mesh or
-stencil meshes) will essentially be ignored. The cut applies to the target mesh's base geometry, not to its geometry
-after modifiers. This can lead to surprising behavior if a target or stencil mesh object has unapplied modifiers.
+stencil meshes) or grease pencil objects will essentially be ignored. The cut applies to the target mesh's base
+geometry, not to its geometry after modifiers. This can lead to surprising behavior if a target or stencil object has
+unapplied modifiers. Note, however, that unapplied modifiers on stencil objects other than meshes and grease pencil
+objects (e.g. curves, surfaces, text) are *not* ignored.
 
 When using strokes or curves as stencils, be aware that the cut may sometimes generate bad geometry, or fail to occur at
 all, if one of the following is true:
